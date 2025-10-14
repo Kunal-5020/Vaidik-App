@@ -2,8 +2,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { API_BASE_URL } from '@env';
 
-const API_BASE_URL = 'http://192.168.31.204:3001/api/v1';
+
+// const API_BASE_URL = 'http://192.168.31.204:3001/api/v1';
 // const API_BASE_URL = 'https://vaidik-server.onrender.com/api/v1'
 
 console.log('🌍 Loaded API_BASE_URL:', API_BASE_URL);
