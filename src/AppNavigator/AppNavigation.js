@@ -20,7 +20,7 @@ import RedeemGiftScreen from '../screens/SidebarScreens/RedemGiftScreen';
 import MembershipScreen from '../screens/SidebarScreens/MembershipScreen';
 import VaidikBlog from '../screens/SidebarScreens/VaidikBlog';
 import Setting from '../screens/setting/Setting';
-import FallowingScreen from '../screens/SidebarScreens/FallowingScreen';
+import FollowingScreen from '../screens/SidebarScreens/FollowingScreen';
 import OrderHistory from '../screens/OrderHistory';
 import SearchScreen from '../screens/SearchScreen';
 import ManagePrivacy from '../screens/ManagePrivacy';
@@ -74,7 +74,7 @@ const AppNavigation = () => {
         <Stack.Screen name="membership" component={MembershipScreen} />
         <Stack.Screen name="Blog" component={VaidikBlog} />
         <Stack.Screen name="Setting" component={Setting} />
-        <Stack.Screen name="fallowing" component={FallowingScreen} />
+        <Stack.Screen name="Following" component={FollowingScreen} />
         <Stack.Screen name="OrderHistory" component={OrderHistory} />
         <Stack.Screen name="SearchScreen" component={SearchScreen} />
         <Stack.Screen name="ManagePrivacy" component={ManagePrivacy} />

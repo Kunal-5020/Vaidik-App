@@ -1,219 +1,305 @@
-import React, { useState } from "react";
+// src/screens/Wallet/WalletScreen.js
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-} from "react-native";
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import walletService from '../../services/api/WalletService';
 
-const WalletScreen = () => {
-  const [activeTab, setActiveTab] = useState("transactions");
+const WalletScreen = ({ navigation }) => {
+  const [activeTab, setActiveTab] = useState('transactions');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+  const [paymentLogs, setPaymentLogs] = useState([]);
 
-  // Dummy Data
-  const transactions = [
-    {
-      id: "1",
-      title: "Chat with Astrologer for 2 minutes",
-      date: "20 Sep 25, 12:53 PM",
-      txnId: "#CHAT_NEW282726048",
-      amount: "+₹0",
-      type: "credit",
-    },
-    {
-      id: "2",
-      title: "Bonus Money",
-      date: "28 May 25, 08:19 PM",
-      txnId: "#AM-1748443790873",
-      amount: "+₹50",
-      type: "credit",
-    },
-    {
-      id: "3",
-      title: "Chat with Astrologer for 2 minutes",
-      date: "23 Mar 25, 07:28 PM",
-      txnId: "#CHAT_NEW226917581",
-      amount: "+₹0",
-      type: "credit",
-    },
-    {
-      id: "4",
-      title: "Birthday gift",
-      date: "08 Sep 24, 09:43 AM",
-      txnId: "#AM-1725768799643",
-      amount: "+₹50",
-      type: "credit",
-    },
-    {
-      id: "5",
-      title: "Chat with Vanshujeet for 2 minutes",
-      date: "10 Jul 24, 07:14 PM",
-      txnId: "#CHAT_NEW102026075",
-      amount: "+₹0",
-      type: "credit",
-    },
-    {
-      id: "6",
-      title: "Bonus AT-Money from chat with Maaya",
-      date: "08 Sep 23, 09:50 PM",
-      txnId: "#CB_1MIN_CHAT-44866110",
-      amount: "+₹7",
-      type: "credit",
-    },
-    {
-      id: "7",
-      title: "Chat with Maaya for 6 minutes",
-      date: "08 Sep 23, 09:50 PM",
-      txnId: "#CHAT_NEW44866110",
-      amount: "-₹42",
-      type: "debit",
-    },
-  ];
+  useEffect(() => {
+    loadWalletData();
+  }, [activeTab]);
 
+  // Load wallet data
+  const loadWalletData = async (refresh = false) => {
+    try {
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      // Load wallet balance
+      const statsResponse = await walletService.getWalletStats();
+      if (statsResponse.success) {
+        setWalletBalance(statsResponse.data.currentBalance || 0);
+      }
+
+      // Load transactions or payment logs based on active tab
+      if (activeTab === 'transactions') {
+        const txnResponse = await walletService.getTransactions({ page: 1, limit: 50 });
+        if (txnResponse.success) {
+          const formattedTxns = txnResponse.data.transactions.map(txn => ({
+            id: txn._id,
+            title: txn.description || getTransactionTitle(txn),
+            date: new Date(txn.createdAt).toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }),
+            txnId: `#${txn.transactionId || txn._id}`,
+            amount: txn.type === 'credit' ? `+₹${txn.amount}` : `-₹${txn.amount}`,
+            type: txn.type,
+          }));
+          setTransactions(formattedTxns);
+        }
+      } else {
+        const logsResponse = await walletService.getPaymentLogs({ page: 1, limit: 50 });
+        if (logsResponse.success) {
+          const formattedLogs = logsResponse.data.logs.map(log => ({
+            id: log._id,
+            title: log.description || 'Payment',
+            date: new Date(log.createdAt).toLocaleString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }),
+            txnId: `#${log.paymentId || log._id}`,
+            amount: `₹${log.amount}`,
+            status: log.status,
+          }));
+          setPaymentLogs(formattedLogs);
+        }
+      }
+    } catch (error) {
+      console.error('Load wallet data error:', error);
+      Alert.alert('Error', 'Failed to load wallet data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Helper function to generate transaction title
+  const getTransactionTitle = (txn) => {
+    switch (txn.type) {
+      case 'credit':
+        if (txn.reason === 'recharge') return 'Wallet Recharge';
+        if (txn.reason === 'refund') return 'Refund';
+        if (txn.reason === 'bonus') return 'Bonus Money';
+        return 'Credit';
+      case 'debit':
+        if (txn.reason === 'chat') return `Chat with Astrologer`;
+        if (txn.reason === 'call') return `Call with Astrologer`;
+        return 'Debit';
+      default:
+        return 'Transaction';
+    }
+  };
+
+  // Render transaction card
   const renderTransaction = ({ item }) => (
     <View style={styles.card}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
         <Text style={styles.cardDate}>{item.date}</Text>
         <Text style={styles.cardTxn}>{item.txnId}</Text>
       </View>
-      <Text
-        style={[
-          styles.amount,
-          item.type === "credit" ? styles.credit : styles.debit,
-        ]}
-      >
+      <Text style={[styles.amount, item.type === 'credit' ? styles.credit : styles.debit]}>
         {item.amount}
       </Text>
     </View>
   );
 
-  return (
-    <View style={styles.container}>
-      {/* Balance Section */}
-      <View style={styles.balanceBox}>
-        <View>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceValue}>₹ 119</Text>
-        </View>
-        <TouchableOpacity style={styles.rechargeBtn}>
-          <Text style={styles.rechargeText}>Recharge</Text>
-        </TouchableOpacity>
+  // Render payment log card
+  const renderPaymentLog = ({ item }) => (
+    <View style={styles.card}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.cardDate}>{item.date}</Text>
+        <Text style={styles.cardTxn}>{item.txnId}</Text>
       </View>
-
-      {/* Inner Tabs */}
-      <View style={styles.innerTabs}>
-        <TouchableOpacity
-          style={[
-            styles.innerTab,
-            activeTab === "transactions" && styles.activeInnerTab,
-          ]}
-          onPress={() => setActiveTab("transactions")}
-        >
-          <Text
-            style={[
-              styles.innerTabText,
-              activeTab === "transactions" && styles.activeInnerTabText,
-            ]}
-          >
-            Wallet Transactions
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.innerTab,
-            activeTab === "logs" && styles.activeInnerTab,
-          ]}
-          onPress={() => setActiveTab("logs")}
-        >
-          <Text
-            style={[
-              styles.innerTabText,
-              activeTab === "logs" && styles.activeInnerTabText,
-            ]}
-          >
-            Payment Logs
-          </Text>
-        </TouchableOpacity>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={styles.amount}>{item.amount}</Text>
+        <Text style={[styles.status, item.status === 'success' ? styles.statusSuccess : styles.statusFailed]}>
+          {item.status}
+        </Text>
       </View>
-
-      {/* Transaction List */}
-      {activeTab === "transactions" ? (
-        <FlatList
-          data={transactions}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTransaction}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        />
-      ) : (
-        <View style={styles.emptyBox}>
-          <Text style={{ color: "#777" }}>No payment logs available</Text>
-        </View>
-      )}
     </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
+        {/* Balance Section */}
+        <View style={styles.balanceBox}>
+          <View>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceValue}>₹ {walletBalance.toFixed(0)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.rechargeBtn}
+            onPress={() => navigation.navigate('AddCash')}
+          >
+            <Text style={styles.rechargeText}>Recharge</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Inner Tabs */}
+        <View style={styles.innerTabs}>
+          <TouchableOpacity
+            style={[styles.innerTab, activeTab === 'transactions' && styles.activeInnerTab]}
+            onPress={() => setActiveTab('transactions')}
+          >
+            <Text
+              style={[
+                styles.innerTabText,
+                activeTab === 'transactions' && styles.activeInnerTabText,
+              ]}
+            >
+              Wallet Transactions
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.innerTab, activeTab === 'logs' && styles.activeInnerTab]}
+            onPress={() => setActiveTab('logs')}
+          >
+            <Text style={[styles.innerTabText, activeTab === 'logs' && styles.activeInnerTabText]}>
+              Payment Logs
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Transaction/Payment List */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#000333" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : activeTab === 'transactions' ? (
+          transactions.length > 0 ? (
+            <FlatList
+              data={transactions}
+              keyExtractor={(item) => item.id}
+              renderItem={renderTransaction}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={() => loadWalletData(true)} />
+              }
+            />
+          ) : (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>No transactions found</Text>
+            </View>
+          )
+        ) : paymentLogs.length > 0 ? (
+          <FlatList
+            data={paymentLogs}
+            keyExtractor={(item) => item.id}
+            renderItem={renderPaymentLog}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => loadWalletData(true)} />
+            }
+          />
+        ) : (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>No payment logs available</Text>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
 
   balanceBox: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     padding: 16,
-    alignItems: "center",
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginBottom: 10,
   },
-  balanceLabel: { fontSize: 14, color: "#555" },
-  balanceValue: { fontSize: 22, fontWeight: "700", marginTop: 4 },
+  balanceLabel: { fontSize: 14, color: '#666' },
+  balanceValue: { fontSize: 26, fontWeight: '700', marginTop: 4, color: '#000' },
   rechargeBtn: {
-    backgroundColor: "#000333",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    backgroundColor: '#000333',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
-  rechargeText: { fontWeight: "600",color:"#fff" },
+  rechargeText: { fontWeight: '600', color: '#fff', fontSize: 14 },
 
   innerTabs: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   innerTab: {
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 8,
     marginHorizontal: 4,
     borderRadius: 20,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    borderWidth:1,
-    borderColor:"grey"
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   activeInnerTab: {
-    backgroundColor: "#000333",
+    backgroundColor: '#000333',
+    borderColor: '#000333',
   },
-  innerTabText: { fontSize: 13, color: "grey", fontWeight: "500" },
-  activeInnerTabText: { color: "#fff", fontWeight: "600" },
+  innerTabText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  activeInnerTabText: { color: '#fff', fontWeight: '600' },
 
   card: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 14,
     marginHorizontal: 12,
-    marginBottom: 10,
+    marginBottom: 8,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  cardTitle: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  cardDate: { fontSize: 12, color: "#777" },
-  cardTxn: { fontSize: 11, color: "#aaa", marginTop: 2 },
-  amount: { fontSize: 14, fontWeight: "600", alignSelf: "center" },
-  credit: { color: "green" },
-  debit: { color: "red" },
+  cardTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4, color: '#000' },
+  cardDate: { fontSize: 12, color: '#777', marginTop: 2 },
+  cardTxn: { fontSize: 11, color: '#aaa', marginTop: 2 },
+  amount: { fontSize: 15, fontWeight: '700', alignSelf: 'center' },
+  credit: { color: '#4CAF50' },
+  debit: { color: '#f44336' },
+  status: { fontSize: 11, marginTop: 4, textTransform: 'capitalize' },
+  statusSuccess: { color: '#4CAF50' },
+  statusFailed: { color: '#f44336' },
 
-  emptyBox: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 10, fontSize: 14, color: '#666' },
+  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
+  emptyText: { color: '#999', fontSize: 15 },
 });
 
 export default WalletScreen;

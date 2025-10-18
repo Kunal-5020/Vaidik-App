@@ -1,25 +1,100 @@
-import React from 'react';
+// src/screens/ProfileHelpSupportScreen.js
+import React, { useState, useEffect } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   Image,
   TouchableOpacity,
   ScrollView,
-  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../context/AuthContext';
+import userService from '../../services/api/UserService';
+import walletService from '../../services/api/WalletService';
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 export default function ProfileHelpSupportScreen({ navigation }) {
-  const onPress = name => {
-    console.log('Pressed', name);
+  const { user, refreshUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  useEffect(() => {
+    loadProfileData();
+    loadWalletBalance();
+  }, []);
+
+  // Load user profile from backend
+  const loadProfileData = async () => {
+    try {
+      setLoading(true);
+      const response = await userService.getProfile();
+      
+      if (response.success) {
+        setProfileData(response.data);
+      }
+    } catch (error) {
+      console.error('Load profile error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Load wallet balance
+  const loadWalletBalance = async () => {
+    try {
+      const response = await walletService.getWalletStats();
+      
+      if (response.success) {
+        setWalletBalance(response.data.currentBalance || 0);
+      }
+    } catch (error) {
+      console.error('Load wallet error:', error);
+    }
+  };
+
+  // Handle navigation
+  const onPress = (action) => {
+    switch (action) {
+      case 'edit':
+        navigation.navigate('Profile');
+        break;
+      case 'recharge':
+        navigation.navigate('AddCash');
+        break;
+      case 'orders':
+        navigation.navigate('order');
+        break;
+      case 'wallet':
+        navigation.navigate('Wallet');
+        break;
+      default:
+        console.log('Pressed', action);
+    }
+  };
+
+  if (loading && !profileData) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Image source={require('../../assets/left.png')} style={styles.leftIcon} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Help and Support</Text>
+          <View style={{ width: 120 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#000" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Yellow Header Bar */}
-
       <View style={styles.headerBar}>
         <TouchableOpacity
           style={{ padding: 8 }}
@@ -39,12 +114,18 @@ export default function ProfileHelpSupportScreen({ navigation }) {
         <View style={styles.card}>
           <View style={styles.profileTop}>
             <Image
-              source={{ uri: 'https://i.pravatar.cc/100' }}
+              source={{
+                uri: profileData?.profileImage || user?.profileImage || 'https://i.pravatar.cc/100',
+              }}
               style={styles.avatar}
             />
             <View style={styles.profileInfo}>
-              <Text style={styles.name}>Pawan Kumar Tiwari</Text>
-              <Text style={styles.phone}>8887842431</Text>
+              <Text style={styles.name}>
+                {profileData?.name || user?.name || 'Guest User'}
+              </Text>
+              <Text style={styles.phone}>
+                {profileData?.phoneNumber || user?.phoneNumber || 'N/A'}
+              </Text>
             </View>
             <TouchableOpacity
               style={styles.editButton}
@@ -57,7 +138,7 @@ export default function ProfileHelpSupportScreen({ navigation }) {
           <View style={styles.walletRow}>
             <Text style={styles.walletLabel}>Wallet & Recharge</Text>
             <View style={styles.walletRight}>
-              <Text style={styles.amount}>₹ 119</Text>
+              <Text style={styles.amount}>₹ {walletBalance.toFixed(0)}</Text>
               <TouchableOpacity
                 style={styles.rechargeBtn}
                 onPress={() => onPress('recharge')}
@@ -98,7 +179,7 @@ export default function ProfileHelpSupportScreen({ navigation }) {
         {/* Customer Support */}
         <TouchableOpacity
           style={styles.supportRow}
-          onPress={() => navigation.navigate('CustomerChatSupport')}
+          onPress={() => navigation.navigate('ChatSupport')}
         >
           <View style={styles.supportLeft}>
             <Icon name="headset" size={20} color="#000" />
@@ -112,7 +193,7 @@ export default function ProfileHelpSupportScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.listRow}
-          onPress={() => navigation.navigate('fallowing')}
+          onPress={() => navigation.navigate('Following')}
         >
           <View style={styles.listLeft}>
             <Icon
@@ -176,6 +257,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 16, fontWeight: '400', color: '#000' },
   container: { padding: 10 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   card: {
     backgroundColor: '#fff',
@@ -267,7 +353,6 @@ const styles = StyleSheet.create({
     width: 25,
     height: 25,
     marginLeft: 5,
-    // marginTop: 5,
     tintColor: '#000',
   },
 });

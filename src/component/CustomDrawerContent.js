@@ -25,8 +25,8 @@ const CustomDrawerContent = ({ navigation }) => {
   const handleMembership = () => {
     navigation.navigate('membership');
   };
-  const handleFallowing = () => {
-    navigation.navigate('fallowing');
+  const handleFollowing = () => {
+    navigation.navigate('Following');
   };
 
   const handleOrderHistory = () => {
@@ -40,8 +40,8 @@ const CustomDrawerContent = ({ navigation }) => {
     });
   };
 
-  const handleProfile = () => {
-    navigation.navigate('Profile');
+  const handleWallet = () => {
+    navigation.navigate('Wallet');
   };
 
   const handleEdit = () => {
@@ -68,7 +68,7 @@ const CustomDrawerContent = ({ navigation }) => {
     <View style={styles.drawerContent}>
       <View style={styles.container}>
         {/* Profile Section */}
-        <TouchableOpacity style={styles.profileSection} onPress={handleProfile}>
+        <TouchableOpacity style={styles.profileSection} onPress={handleEdit}>
           <Image
             source={require('../assets/profile.png')}
             resizeMode="contain"
@@ -76,7 +76,12 @@ const CustomDrawerContent = ({ navigation }) => {
           />
           <View style={styles.textContainer}>
             <Text style={styles.name}>
-              {isAuthenticated && user && user.name ? user.name : guestName}
+              {isAuthenticated && user && user.name ? user.name : guestName }
+               <Image
+              source={require('../assets/pen.png')}
+              resizeMode="contain"
+              style={styles.penIcon}
+            />
             </Text>
             <Text style={styles.number}>
               {isAuthenticated && user && user.phoneNumber
@@ -88,13 +93,6 @@ const CustomDrawerContent = ({ navigation }) => {
 
         {/* Buttons Section */}
         <View style={styles.buttonSection}>
-          <TouchableOpacity onPress={handleEdit}>
-            <Image
-              source={require('../assets/pen.png')}
-              resizeMode="contain"
-              style={styles.penIcon}
-            />
-          </TouchableOpacity>
 
           <TouchableOpacity style={styles.crossButton} onPress={handleCancel}>
             <Image
@@ -140,7 +138,10 @@ const CustomDrawerContent = ({ navigation }) => {
           <Text style={styles.label}>Customer Support Chat</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.sidebarItem}>
+        <TouchableOpacity 
+        style={styles.sidebarItem}
+        onPress={handleWallet}
+        >
           <Image
             source={require('../assets/wallet.png')}
             resizeMode="contain"
@@ -206,7 +207,7 @@ const CustomDrawerContent = ({ navigation }) => {
           <Text style={styles.label}>Chat with Astrologers</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.sidebarItem} onPress={handleFallowing}>
+        <TouchableOpacity style={styles.sidebarItem} onPress={handleFollowing}>
           <Image
             source={require('../assets/following.png')}
             resizeMode="contain"

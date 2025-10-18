@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import FontAwesome5 from "react-native-vector-icons/FontAwesome5";
 
 const CustomerChatSupport = ({ navigation }) => {
   return (
-    <SafeAreaProvider>
+
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -103,7 +103,6 @@ const CustomerChatSupport = ({ navigation }) => {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </SafeAreaProvider>
   );
 };
 

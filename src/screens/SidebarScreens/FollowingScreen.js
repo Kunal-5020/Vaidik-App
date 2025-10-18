@@ -10,7 +10,7 @@ import React from 'react';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-const FallowingScreen = ({ navigation }) => {
+const FollowingScreen = ({ navigation }) => {
   const handleGoBack = () => {
     navigation.goBack();
   };
@@ -33,7 +33,7 @@ const FallowingScreen = ({ navigation }) => {
   );
 };
 
-export default FallowingScreen;
+export default FollowingScreen;
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: '#f5f5f5'},

@@ -14,6 +14,10 @@ const avatars = [
   { id: '1', name: 'Aries', img: require('../assets/avatar/avatar1.jpg') },
   { id: '2', name: 'Taurus', img: require('../assets/avatar/avatar2.jpg') },
   { id: '3', name: 'Gemini', img: require('../assets/avatar/avatar3.jpg') },
+  { id: '4', name: 'Cancer', img: require('../assets/avatar/avatar1.jpg') },
+  { id: '5', name: 'Leo', img: require('../assets/avatar/avatar2.jpg') },
+  { id: '6', name: 'Virgo', img: require('../assets/avatar/avatar3.jpg') },
+  { id: '7', name: 'Libra', img: require('../assets/avatar/avatar1.jpg') },
 ];
 
 const AvatarPicker = ({ visible, onClose, onSelect, selectedId }) => {
@@ -23,41 +27,56 @@ const AvatarPicker = ({ visible, onClose, onSelect, selectedId }) => {
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>Change Profile Pic</Text>
-          <Text style={styles.subtitle}>Select from Library</Text>
+          <Text style={styles.title}>Change Profile Picture</Text>
+          <Text style={styles.subtitle}>Select from our collection</Text>
 
           <FlatList
             data={avatars}
             keyExtractor={item => item.id}
             numColumns={4}
-            contentContainerStyle={{ alignItems: 'center' }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[
-                  styles.avatarContainer,
-                  selectedId === item.id && styles.selectedAvatar
-                ]}
+                style={styles.avatarWrapper}
                 onPress={() => {
                   onSelect(item.id);
                   onClose();
                 }}
+                activeOpacity={0.7}
               >
-                <Image source={item.img} style={styles.avatar} />
+                <View
+                  style={[
+                    styles.avatarContainer,
+                    selectedId === item.id && styles.selectedAvatarContainer
+                  ]}
+                >
+                  <Image source={item.img} style={styles.avatar} />
+                </View>
                 {selectedId === item.id && (
                   <View style={styles.checkMark}>
                     <Text style={styles.checkText}>✓</Text>
                   </View>
                 )}
-                <Text style={styles.name}>{item.name}</Text>
+                <Text 
+                  style={[
+                    styles.name,
+                    selectedId === item.id && styles.selectedName
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
               </TouchableOpacity>
             )}
           />
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Cancel</Text>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+            <Text style={styles.closeBtnText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -70,55 +89,80 @@ export default AvatarPicker;
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   card: {
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '75%',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    alignItems: 'center',
+    borderRadius: 16,
+    padding: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
     color: '#000033',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: '#555',
-    marginBottom: 15,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  listContent: {
+    paddingBottom: 10,
+  },
+  avatarWrapper: {
+    alignItems: 'center',
+    margin: 6,
+    width: 70,
   },
   avatarContainer: {
-    alignItems: 'center',
-    margin: 10,
-    position: 'relative',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    padding: 2, // ✅ Creates space between border and image
+    backgroundColor: '#fff',
   },
-  selectedAvatar: {
+  selectedAvatarContainer: {
     borderWidth: 3,
     borderColor: '#f39c12',
-    borderRadius: 35,
-    padding: 2,
+    elevation: 4,
+    shadowColor: '#f39c12',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: '100%',
+    height: '100%',
+    borderRadius: 28, // ✅ Slightly smaller to fit inside padding
+    resizeMode: 'cover',
   },
   checkMark: {
     position: 'absolute',
-    top: -5,
-    right: -5,
+    top: -4,
+    right: 3,
     backgroundColor: '#f39c12',
     width: 24,
     height: 24,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 3,
   },
   checkText: {
     color: '#fff',
@@ -126,15 +170,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   name: {
-    marginTop: 5,
-    fontSize: 12,
+    marginTop: 6,
+    fontSize: 11,
     textAlign: 'center',
+    color: '#666',
+    fontWeight: '500',
+  },
+  selectedName: {
+    color: '#f39c12',
+    fontWeight: '700',
   },
   closeBtn: {
-    marginTop: 15,
-    backgroundColor: '#f39c12',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: '#000033',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
     borderRadius: 8,
+    alignSelf: 'center',
+    elevation: 2,
+  },
+  closeBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.5,
   },
 });

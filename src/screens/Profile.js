@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,23 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Image,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api/UserService';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AvatarPicker from '../component/AvatarPicker';
-import PofileStyle from '../style/ProfileStyle';
+import ProfileStyle from '../style/ProfileStyle';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Profile = () => {
   const { user, isAuthenticated, fetchUserProfile } = useAuth();
   const navigation = useNavigation();
+  const scrollViewRef = useRef(null);
 
   // State variables
   const [name, setName] = useState('');
@@ -43,10 +45,7 @@ const Profile = () => {
   const [originalData, setOriginalData] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
 
-  // ✅ ADDED: Track if profile has been loaded to prevent re-loading
-  const hasLoadedProfile = useRef(false);
-
-  const styles = PofileStyle;
+  const styles = ProfileStyle;
 
   // Check authentication
   useEffect(() => {
@@ -65,79 +64,87 @@ const Profile = () => {
     }
   }, [isAuthenticated, navigation]);
 
-  // ✅ FIXED: Only fetch user profile once when screen is focused
+  // ✅ FIX: Fetch user profile ONLY when screen focuses - NO dependencies
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
+      let isMounted = true;
+
       const loadUserProfile = async () => {
-        if (isAuthenticated && !hasLoadedProfile.current) {
-          console.log('📡 Fetching user profile...');
-          setLoading(true);
-          try {
+        if (!isAuthenticated) return;
+
+        console.log('📡 Fetching user profile...');
+        setLoading(true);
+        try {
+          if (fetchUserProfile) {
             await fetchUserProfile();
-            hasLoadedProfile.current = true; // ✅ Mark as loaded
+          }
+          if (isMounted) {
             console.log('✅ User profile loaded');
-          } catch (error) {
-            console.error('❌ Failed to fetch profile:', error);
-          } finally {
+          }
+        } catch (error) {
+          console.error('❌ Failed to fetch profile:', error);
+        } finally {
+          if (isMounted) {
             setLoading(false);
           }
         }
       };
+
       loadUserProfile();
 
-      // ✅ ADDED: Reset flag when screen loses focus
+      // Cleanup function
       return () => {
-        hasLoadedProfile.current = false;
+        isMounted = false;
       };
-    }, [isAuthenticated]) // ✅ REMOVED: fetchUserProfile from dependencies
+    }, []) // ✅ EMPTY DEPENDENCY ARRAY - runs only on focus/unfocus
   );
 
-  // ✅ FIXED: Load user data only once when user is available
+  // ✅ FIX: Load user data when user object changes
   useEffect(() => {
-    if (user && isAuthenticated && !dataLoaded) {
-      console.log('📝 Loading user data into form...');
-      
-      const userData = {
-        name: user.name || '',
-        gender: user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Male',
-        dob: user.dateOfBirth ? new Date(user.dateOfBirth) : new Date(),
-        time: new Date(),
-        placeOfBirth: user.placeOfBirth || '',
-        address: user.currentAddress || '',
-        cityStateCountry: [user.city, user.state, user.country].filter(Boolean).join(', '),
-        pincode: user.pincode || '',
-        avatarId: user.profileImage || '0',
-      };
+    if (!user || !isAuthenticated) return;
 
-      if (user.timeOfBirth) {
-        const [hours, minutes] = user.timeOfBirth.split(':');
-        const timeDate = new Date();
-        timeDate.setHours(parseInt(hours), parseInt(minutes));
-        userData.time = timeDate;
-      }
+    console.log('📝 Loading user data into form...');
+    
+    const userData = {
+      name: user.name || '',
+      gender: user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Male',
+      dob: user.dateOfBirth ? new Date(user.dateOfBirth) : new Date(),
+      time: new Date(),
+      placeOfBirth: user.placeOfBirth || '',
+      address: user.currentAddress || '',
+      cityStateCountry: [user.city, user.state, user.country].filter(Boolean).join(', '),
+      pincode: user.pincode || '',
+      avatarId: user.profileImage || '0',
+    };
 
-      // Set form values
-      setName(userData.name);
-      setGender(userData.gender);
-      setDob(userData.dob);
-      setTime(userData.time);
-      setPlaceOfBirth(userData.placeOfBirth);
-      setAddress(userData.address);
-      setCityStateCountry(userData.cityStateCountry);
-      setPincode(userData.pincode);
-      setSelectedAvatarId(userData.avatarId);
-
-      // Store original data
-      setOriginalData(userData);
-      setDataLoaded(true);
-
-      console.log('✅ Form data loaded');
+    if (user.timeOfBirth) {
+      const [hours, minutes] = user.timeOfBirth.split(':');
+      const timeDate = new Date();
+      timeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+      userData.time = timeDate;
     }
-  }, [user, isAuthenticated, dataLoaded]); // ✅ ADDED: dataLoaded to prevent re-loading
+
+    // Set form values
+    setName(userData.name);
+    setGender(userData.gender);
+    setDob(userData.dob);
+    setTime(userData.time);
+    setPlaceOfBirth(userData.placeOfBirth);
+    setAddress(userData.address);
+    setCityStateCountry(userData.cityStateCountry);
+    setPincode(userData.pincode);
+    setSelectedAvatarId(userData.avatarId);
+
+    // Store original data
+    setOriginalData(userData);
+    setDataLoaded(true);
+
+    console.log('✅ Form data loaded');
+  }, [user, isAuthenticated]); // ✅ Only depends on user and auth status
 
   // Detect changes
   useEffect(() => {
-    if (!dataLoaded) return;
+    if (!dataLoaded || !originalData.name) return;
 
     const currentData = {
       name: name.trim(),
@@ -196,11 +203,13 @@ const Profile = () => {
     };
   };
 
-  const handleAvatarSelect = (avatarId) => {
+  const handleAvatarSelect = useCallback((avatarId) => {
     setSelectedAvatarId(avatarId);
-  };
+  }, []);
 
   const handleSubmit = async () => {
+    Keyboard.dismiss();
+
     // Validation
     if (!name.trim()) {
       Alert.alert('Validation Error', 'Name is required');
@@ -260,10 +269,11 @@ const Profile = () => {
           {
             text: 'OK',
             onPress: () => {
-              // ✅ FIXED: Reload user data after successful update
+              // ✅ Reset state and refetch
               setDataLoaded(false);
-              hasLoadedProfile.current = false;
-              fetchUserProfile?.();
+              if (fetchUserProfile) {
+                fetchUserProfile();
+              }
               setHasChanges(false);
               navigation.goBack();
             },
@@ -284,26 +294,25 @@ const Profile = () => {
   };
 
   // Show loading while checking auth or loading user data
-  if (!isAuthenticated || !dataLoaded) {
+  if (!isAuthenticated || (loading && !dataLoaded)) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color="#000033" />
-          <Text style={{ marginTop: 10, color: '#000033' }}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#000033" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={0}
       >
-        <View style={styles.headerCantainer}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Image
               source={require('../assets/back.png')}
               style={styles.leftIcon}
@@ -315,23 +324,29 @@ const Profile = () => {
         <View style={styles.line} />
 
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.avatarContainer}>
-            <Image
-              source={selectedAvatarId === '0' ? require('../assets/Avatar.jpg') : { uri: selectedAvatarId }}
-              style={styles.profileAvatar}
-            />
-          </View>
+          {/* Avatar Section */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={selectedAvatarId === '0' ? require('../assets/Avatar.jpg') : { uri: selectedAvatarId }}
+                style={styles.profileAvatar}
+              />
+            </View>
 
-          <View style={styles.AvatarUploadContainer}>
-            <TouchableOpacity onPress={() => setPickerVisible(true)}>
+            <TouchableOpacity 
+              style={styles.avatarUploadContainer} 
+              onPress={() => setPickerVisible(true)}
+              activeOpacity={0.7}
+            >
               <Image
                 source={require('../assets/upload.png')}
-                style={styles.AvatarUpload}
+                style={styles.avatarUpload}
               />
             </TouchableOpacity>
           </View>
@@ -347,123 +362,135 @@ const Profile = () => {
             {user?.phoneNumber || '+91-0000000000'}
           </Text>
 
-          <Text style={styles.label}>
-            Name <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter full name"
-            value={name}
-            onChangeText={setName}
-            returnKeyType="next"
-          />
-
-          <View style={styles.radioContainer}>
-            <Text style={styles.label}>Gender</Text>
-            <View style={styles.radioOptions}>
-              {['Male', 'Female'].map(option => (
-                <TouchableOpacity
-                  key={option}
-                  style={styles.radioOption}
-                  onPress={() => setGender(option)}
-                >
-                  <View
-                    style={[
-                      styles.radio,
-                      gender === option && styles.radioSelected,
-                    ]}
-                  >
-                    {gender === option && <View style={styles.radioInner} />}
-                  </View>
-                  <Text style={styles.radioLabel}>{option}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <Text style={styles.label}>
-            Date of Birth <Text style={styles.required}></Text>
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowDatePicker(true)}
-            style={styles.underlineInput}
-          >
-            <Text style={styles.dateText}>{dob.toDateString()}</Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={dob}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-              maximumDate={new Date()}
-            />
-          )}
-
-          <Text style={styles.label}>
-            Time of Birth <Text style={styles.required}></Text>
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowTimePicker(true)}
-            style={styles.underlineInput}
-          >
-            <Text style={styles.dateText}>
-              {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {/* Form Fields */}
+          <View style={styles.formContainer}>
+            <Text style={styles.label}>
+              Name <Text style={styles.required}>*</Text>
             </Text>
-          </TouchableOpacity>
-          {showTimePicker && (
-            <DateTimePicker
-              value={time}
-              mode="time"
-              display="default"
-              onChange={handleTimeChange}
+            <TextInput
+              style={styles.input}
+              placeholder="Enter full name"
+              placeholderTextColor="#999"
+              value={name}
+              onChangeText={setName}
+              returnKeyType="next"
+              autoCapitalize="words"
             />
-          )}
 
-          <Text style={styles.label}>
-            Place of Birth <Text style={styles.required}></Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter place of birth"
-            value={placeOfBirth}
-            onChangeText={setPlaceOfBirth}
-          />
+            <View style={styles.radioContainer}>
+              <Text style={styles.label}>Gender</Text>
+              <View style={styles.radioOptions}>
+                {['Male', 'Female'].map(option => (
+                  <TouchableOpacity
+                    key={option}
+                    style={styles.radioOption}
+                    onPress={() => setGender(option)}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        styles.radio,
+                        gender === option && styles.radioSelected,
+                      ]}
+                    >
+                      {gender === option && <View style={styles.radioInner} />}
+                    </View>
+                    <Text style={styles.radioLabel}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-          <Text style={styles.label}>
-            Current Address <Text style={styles.required}></Text>
-          </Text>
-          <TextInput
-            style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
-            placeholder="Enter Flat/House No., Street, Area"
-            value={address}
-            onChangeText={setAddress}
-            multiline
-          />
+            <Text style={styles.label}>Date of Birth</Text>
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(true)}
+              style={styles.underlineInput}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dateText}>{dob.toDateString()}</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={dob}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            )}
 
-          <Text style={styles.label}>
-            City, State, Country <Text style={styles.required}></Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter Town/City, State, Country"
-            value={cityStateCountry}
-            onChangeText={setCityStateCountry}
-          />
+            <Text style={styles.label}>Time of Birth</Text>
+            <TouchableOpacity
+              onPress={() => setShowTimePicker(true)}
+              style={styles.underlineInput}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dateText}>
+                {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                value={time}
+                mode="time"
+                display="default"
+                onChange={handleTimeChange}
+              />
+            )}
 
-          <Text style={styles.label}>
-            Pincode <Text style={styles.required}></Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter pincode"
-            keyboardType="numeric"
-            value={pincode}
-            onChangeText={setPincode}
-            maxLength={6}
-          />
+            <Text style={styles.label}>
+              Place of Birth 
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter place of birth"
+              placeholderTextColor="#999"
+              value={placeOfBirth}
+              onChangeText={setPlaceOfBirth}
+              autoCapitalize="words"
+            />
+
+            <Text style={styles.label}>
+              Current Address 
+            </Text>
+            <TextInput
+              style={[styles.input]}
+              placeholder="Enter Flat/House No., Street, Area"
+              placeholderTextColor="#999"
+              value={address}
+              onChangeText={setAddress}
+              multiline
+              numberOfLines={3}
+            />
+
+            <Text style={styles.label}>
+              City, State, Country 
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter Town/City, State, Country"
+              placeholderTextColor="#999"
+              value={cityStateCountry}
+              onChangeText={setCityStateCountry}
+              autoCapitalize="words"
+            />
+
+            <Text style={styles.label}>
+              Pincode 
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter pincode"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+              value={pincode}
+              onChangeText={setPincode}
+              maxLength={6}
+            />
+          </View>
         </ScrollView>
 
+        {/* Submit Button */}
         <View style={styles.submitButtonContainer}>
           <TouchableOpacity
             style={[
@@ -472,14 +499,20 @@ const Profile = () => {
             ]}
             onPress={handleSubmit}
             disabled={!hasChanges || loading}
+            activeOpacity={0.8}
           >
             {loading ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
                 <Text style={styles.submitButtonText}>SAVING...</Text>
               </View>
             ) : (
-              <Text style={[styles.submitButtonText, !hasChanges && { color: '#999' }]}>SUBMIT</Text>
+              <Text style={[
+                styles.submitButtonText, 
+                !hasChanges && styles.submitButtonTextDisabled
+              ]}>
+                SUBMIT
+              </Text>
             )}
           </TouchableOpacity>
         </View>

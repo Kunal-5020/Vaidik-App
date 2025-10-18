@@ -1,4 +1,4 @@
-// src/services/api/astrologerService.js
+// src/services/api/AstrologerService.js
 import apiClient from './config';
 
 /**

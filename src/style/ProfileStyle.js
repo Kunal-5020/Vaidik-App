@@ -1,254 +1,250 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 const ProfileStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
-    // backgroundColor: 'white',
-    backgroundColor: 'rgb(245, 245, 245)',
+    backgroundColor: '#f5f5f5',
   },
-  header: {
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#000033',
+    fontWeight: '500',
+  },
+
+  // Header Styles
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    // Adjusting padding to simulate the top bar in your first screenshot
-    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  backArrow: {
-    fontSize: 28,
-    marginRight: 10,
-    color: '#000',
+  backButton: {
+    padding: 8,
+    marginRight: 12,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
+  leftIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#000033',
   },
+  headText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000033',
+    flex: 1,
+  },
+  line: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+
+  // ScrollView Styles
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20, // Padding for content
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
 
-  // --- Radio Button Styles ---
+  // Avatar Section - FIXED BORDER
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+    position: 'relative',
+  },
+  avatarContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: '#000033',
+    padding: 4, // ✅ Padding creates space between border and image
+    backgroundColor: '#fff',
+    // ✅ Shadow for depth
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  profileAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 56, // ✅ Slightly smaller radius for proper fit
+    resizeMode: 'cover',
+  },
+  avatarUploadContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: (width / 2) - 70, // ✅ Properly centered
+    width: 36,
+    height: 36,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#000033',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  avatarUpload: {
+    width: 18,
+    height: 18,
+    tintColor: '#f39c12',
+  },
+  phoneNumber: {
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#666',
+  },
+
+  // Form Container
+  formContainer: {
+    paddingHorizontal: 20,
+  },
+
+  // Form Field Styles
+  label: {
+    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000033',
+  },
+  required: {
+    color: '#e74c3c',
+    fontSize: 16,
+  },
+  input: {
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000033',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 20,
+    fontSize: 15,
+    color: '#333',
+    backgroundColor: 'transparent',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 8,
+  },
+  underlineInput: {
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000033',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    marginBottom: 20,
+    justifyContent: 'center',
+  },
+  dateText: {
+    fontSize: 15,
+    color: '#333',
+  },
+
+  // Radio Button Styles
   radioContainer: {
     flexDirection: 'row',
-    marginBottom: 25,
-    paddingTop: 5,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   radioOptions: {
     flexDirection: 'row',
-    marginTop: -2,
-    // paddingVertical: -3,
-    marginHorizontal: 20,
+    marginLeft: 20,
   },
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 30,
+    marginRight: 24,
   },
   radio: {
-    height: 20,
-    width: 20,
-    borderRadius: 10,
-    borderWidth: 1,
+    height: 22,
+    width: 22,
+    borderRadius: 11,
+    borderWidth: 2,
     borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
   radioSelected: {
-    borderColor: '#000333',
+    borderColor: '#000033',
   },
   radioInner: {
-    height: 10,
-    width: 10,
-    borderRadius: 5,
-    backgroundColor: '#000333',
+    height: 12,
+    width: 12,
+    borderRadius: 6,
+    backgroundColor: '#000033',
   },
   radioLabel: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '400',
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
   },
 
-  // --- Submit Button Styles (FIXED) ---
+  // Submit Button Styles - IMPROVED
   submitButtonContainer: {
-    // This container is responsible for holding the button and being lifted by the KAV
     backgroundColor: '#fff',
-    padding: 0,
-    // Removed border top to prevent overlap issues
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   submitButton: {
-    width: '100%',
-    // Margin is applied here to give the button space from the edges
     backgroundColor: '#000033',
     alignItems: 'center',
     justifyContent: 'center',
     height: 50,
-    marginHorizontal: 1,
-    marginVertical: 14, // Gives vertical padding inside the container
+    borderRadius: 8,
+    elevation: 2,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#d0d0d0',
+    elevation: 0,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  //   =====================
-  label: {
-    marginBottom: 5,
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#000033',
-  },
-  required: {
-    color: 'grey',
-  },
-  input: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#333',
-    paddingVertical: 4,
-    marginBottom: 10,
     fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
-  genderContainer: {
+  submitButtonTextDisabled: {
+    color: '#999',
+  },
+  loadingContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
     alignItems: 'center',
-  },
-  radioText: {
-    marginLeft: 6,
-    fontSize: 16,
-  },
-  radioCircle: {
-    height: 20,
-    width: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#444',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedRb: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#444',
-  },
-  dateText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  underlineInput: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#333',
-    paddingVertical: 8,
-    marginBottom: 20,
-    justifyContent: 'center',
-  },
-  submitContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 750,
-    backgroundColor: '#000033',
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
-  },
-  submitBtn: {
-    backgroundColor: '#000033',
-    paddingVertical: 14,
-    borderRadius: 1,
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-  },
-
-  submitText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  leftIcon: {
-    width: 20,
-    height: 20,
-    marginLeft: 25,
-    marginTop: 5,
-    // tintColor: 'white',
-  },
-  avatarContainer: {
-    marginTop: 20,
-    width: 130,
-    padding: 10,
-    marginHorizontal: 110,
-    height: 130,
-    borderWidth: 2,
-    borderColor: '#000033',
-    borderRadius: 62,
-    // backgroundColor:'yellow'
-  },
-
-  profileAvatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55, // Make the image circular
-    resizeMode: 'cover',
-    // marginHorizontal:110
-  },
-  headText: {
-    fontSize: 19,
-    fontWeight: '400',
-    marginBottom: 10,
-    marginLeft: 65,
-    // color: 'white',
-  },
-  line: {
-    marginTop: -3,
-    height: 1,
-    width: '110%',
-    backgroundColor: '#ccc',
-    right: 12,
-  },
-  headerCantainer: {
-    flexDirection: 'row',
-    // marginTop:10,
-    // backgroundColor: '#000333',
-    padding: 10,
-    width: '110%',
-    right: 16,
-  },
-  AvatarUpload: {
-    width: 22,
-    height: 22,
-    tintColor: 'orange',
-    padding: 2,
-    margin: 2,
-  },
-  AvatarUploadContainer: {
-    width: 30,
-    height: 30,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    left: 210,
-    top: -35,
-    borderWidth: 2,
-    borderColor: 'lightgrey',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  phoneNumber: {
-    left: 110,
-    marginVertical: -8,
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'grey',
+    gap: 8,
   },
 });
 

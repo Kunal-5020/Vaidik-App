@@ -1,42 +1,97 @@
+// src/screens/ManagePrivacy.js
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
-  TextInput,
   TouchableOpacity,
-  Switch, 
+  Switch,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
 } from 'react-native';
-import React, { useState } from 'react';
-import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import userService from '../services/api/UserService';
 
 const ManagePrivacy = ({ navigation }) => {
-  // State to manage the toggle switches for each privacy setting
-  const [privacySettings, setPrivacySettings] = useState({
-    chatAccess: false,
-    downloadAccess: false,
-    screenshots: false,
-    callAccess: false,
-  });
+  const [loading, setLoading] = useState(false);
+  const [chatAccess, setChatAccess] = useState(false);
+  const [imageDownload, setImageDownload] = useState(false);
+  const [screenshot, setScreenshot] = useState(false);
+  const [callRecording, setCallRecording] = useState(false);
 
-  const handleToggle = settingKey => {
-    setPrivacySettings(prevSettings => ({
-      ...prevSettings,
-      [settingKey]: !prevSettings[settingKey],
-    }));
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  // Load privacy settings from backend
+  const loadPreferences = async () => {
+    setLoading(true);
+    try {
+      const response = await userService.getPreferences();
+      const data = response.data;
+
+      console.log('📋 Loaded privacy data:', data);
+
+      // ✅ Map from nested structure (matching Settings.js pattern)
+      setChatAccess(data.privacy?.restrictions?.astrologerChatAccessAfterEnd === true);
+      setImageDownload(data.privacy?.restrictions?.downloadSharedImages === true);
+      setScreenshot(data.privacy?.restrictions?.restrictChatScreenshots === true);
+      setCallRecording(data.privacy?.restrictions?.accessCallRecording === true);
+
+      console.log('✅ Privacy values set');
+    } catch (error) {
+      console.error('❌ Failed to load preferences:', error);
+      Alert.alert('Error', 'Failed to load privacy settings');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Dummy function for back navigation
-  const handleBack = () => {
-    console.log('Go back to previous screen');
-    // In a real app, this would use navigation.goBack()
-  };
-  const handleGoBack = () => {
-    navigation.goBack();
+  // Save preference to backend
+  const savePreference = async (patch) => {
+    try {
+      console.log('💾 Saving privacy preference:', patch);
+      const response = await userService.updatePreferences(patch);
+      console.log('✅ Saved successfully:', response.data);
+    } catch (error) {
+      console.error('❌ Failed to update preference:', error);
+      Alert.alert('Error', 'Failed to update privacy setting');
+    }
   };
 
-    // Reusable component for each row
-  const SettingRow = ({ title, subtitle, settingKey }) => {
+  // Toggle handlers (matching Settings.js pattern)
+  const toggleChatAccess = (val) => {
+    setChatAccess(val);
+    savePreference({
+          astrologerChatAccessAfterEnd: val,
+    });
+  };
+
+  const toggleImageDownload = (val) => {
+    setImageDownload(val);
+    savePreference({
+          downloadSharedImages: val,
+    });
+  };
+
+  const toggleScreenshot = (val) => {
+    setScreenshot(val);
+    savePreference({
+          restrictChatScreenshots: val,
+    });
+  };
+
+  const toggleCallRecording = (val) => {
+    setCallRecording(val);
+    savePreference({
+          accessCallRecording: val,
+    });
+  };
+
+  // Reusable component for each row
+  const SettingRow = ({ title, subtitle, value, onToggle }) => {
     return (
       <View style={styles.settingRow}>
         <View style={styles.textContainer}>
@@ -44,18 +99,42 @@ const ManagePrivacy = ({ navigation }) => {
           <Text style={styles.settingSubtitle}>{subtitle}</Text>
         </View>
         <Switch
-          trackColor={{ false: '#767577', true: '#ffc107' }} // Yellow color for 'ON'
-          thumbColor={privacySettings[settingKey] ? '#fff' : '#fff'}
-          onValueChange={() => handleToggle(settingKey)}
-          value={privacySettings[settingKey]}
+          trackColor={{ false: '#d3d3d3', true: '#81b0ff' }}
+          thumbColor={value ? '#007AFF' : '#f4f3f4'}
+          ios_backgroundColor="#d3d3d3"
+          onValueChange={onToggle}
+          value={value}
+          disabled={loading}
         />
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Image
+              source={require('../assets/left.png')}
+              style={styles.leftIcon}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headText}>Manage my privacy</Text>
+        </View>
+        <View style={styles.line} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading settings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View style={styles.cantainer}>
-      <View style={styles.headerCantainer}>
-        <TouchableOpacity onPress={handleGoBack}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image
             source={require('../assets/left.png')}
             style={styles.leftIcon}
@@ -66,97 +145,139 @@ const ManagePrivacy = ({ navigation }) => {
 
       <View style={styles.line} />
 
-            {/* Settings List */}
-      <View style={styles.listContainer}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.listContainer}
+      >
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            Control what astrologers can access during and after your consultations
+          </Text>
+        </View>
+
         <SettingRow
-          title="Chat Access"
-          subtitle="Astrologers can access your chat after the chat ends"
-          settingKey="chatAccess"
+          title="Chat Access After Session"
+          subtitle="Allow astrologers to access chat history after the session ends"
+          value={chatAccess}
+          onToggle={toggleChatAccess}
         />
+        
         <SettingRow
-          title="Download Access"
-          subtitle="Astrologers can download the images you shared"
-          settingKey="downloadAccess"
+          title="Image Download Permission"
+          subtitle="Allow astrologers to download images you share during chat"
+          value={imageDownload}
+          onToggle={toggleImageDownload}
         />
+        
         <SettingRow
-          title="Screenshots"
-          subtitle="Astrologers can access your chat after the call ends"
-          settingKey="screenshots"
+          title="Restrict Screenshots"
+          subtitle="Prevent astrologers from taking screenshots of your chat"
+          value={screenshot}
+          onToggle={toggleScreenshot}
         />
+        
         <SettingRow
-          title="Call Access"
-          subtitle="Astrologers can access your call recordings"
-          settingKey="callAccess"
+          title="Call Recording Access"
+          subtitle="Allow astrologers to access your call recordings"
+          value={callRecording}
+          onToggle={toggleCallRecording}
         />
-      </View>
-    </View>
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 export default ManagePrivacy;
 
 const styles = StyleSheet.create({
-  cantainer: {
+  safeArea: {
     flex: 1,
-    marginTop: 20,
     backgroundColor: 'rgb(245, 245, 245)',
   },
-  headerCantainer: {
+  headerContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: '#fff',
+    height: 50,
   },
   leftIcon: {
-    width: 25,
-    height: 25,
-    marginLeft: 20,
-    // marginTop: 5,
+    width: 20,
+    height: 20,
+    tintColor: '#000',
   },
   headText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '400',
-    marginBottom: 15,
-    marginLeft: 45,
+    marginLeft: 20,
+    color: '#000',
   },
   line: {
-    marginTop: 1,
     height: 1,
-    width: '%',
-    backgroundColor: '#ccc',
-    marginLeft: 10,
+    width: '100%',
+    backgroundColor: '#ddd',
   },
-  input: {
+  scrollView: {
     flex: 1,
-    fontSize: 16,
-    paddingVertical: 12,
-    fontWeight: 'bold',
-    // marginLeft: 10,
-  },
-  searchIcon: {
-    marginLeft: 150,
   },
   listContainer: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     paddingTop: 10,
+  },
+  infoBox: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   textContainer: {
     flex: 1,
     paddingRight: 15,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#000',
-    marginBottom: 2,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   settingSubtitle: {
-    fontSize: 13,
-    color: '#888',
+    fontSize: 12,
+    color: '#555',
+    lineHeight: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  bottomSpace: {
+    height: 40,
   },
 });
-
