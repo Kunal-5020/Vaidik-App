@@ -52,54 +52,55 @@ const Chat = ({ navigation }) => {
 
   // Filter options
   const filterSections = {
-    'Sort by': [
-      { id: 'popularity', label: 'Popularity' },
-      { id: 'exp-high-low', label: 'Experience: High to Low' },
-      { id: 'exp-low-high', label: 'Experience: Low to High' },
-      { id: 'orders-high-low', label: 'Orders: High to Low' },
-      { id: 'orders-low-high', label: 'Orders: Low to High' },
-      { id: 'price-high-low', label: 'Price: High to Low' },
-      { id: 'price-low-high', label: 'Price: Low to High' },
-      { id: 'rating-high-low', label: 'Rating: High to Low' },
-    ],
-    'Skill': [
-      { id: 'vedic', label: 'Vedic' },
-      { id: 'tarot', label: 'Tarot' },
-      { id: 'numerology', label: 'Numerology' },
-      { id: 'palmistry', label: 'Palmistry' },
-      { id: 'face-reading', label: 'Face Reading' },
-      { id: 'kp', label: 'KP' },
-      { id: 'life-coach', label: 'Life Coach' },
-      { id: 'nadi', label: 'Nadi' },
-      { id: 'prashana', label: 'Prashana' },
-      { id: 'psychic', label: 'Psychic' },
-    ],
-    'Language': [
-      { id: 'english', label: 'English' },
-      { id: 'hindi', label: 'Hindi' },
-      { id: 'bengali', label: 'Bengali' },
-      { id: 'gujarati', label: 'Gujarati' },
-      { id: 'kannada', label: 'Kannada' },
-      { id: 'malayalam', label: 'Malayalam' },
-      { id: 'marathi', label: 'Marathi' },
-      { id: 'punjabi', label: 'Punjabi' },
-      { id: 'tamil', label: 'Tamil' },
-    ],
-    'Gender': [
-      { id: 'female', label: 'Female' },
-      { id: 'male', label: 'Male' },
-    ],
-    'Country': [
-      { id: 'india', label: 'India' },
-      { id: 'outside-india', label: 'Outside India' },
-    ],
-    'Top Astrologers': [
-      { id: 'celebrity', label: 'Celebrity', subtitle: 'They have the highest fan following & people are crazy about them' },
-      { id: 'top-choice', label: 'Top Choice', subtitle: 'If you talk to them once, you are their customer for life' },
-      { id: 'rising-star', label: 'Rising Star', subtitle: 'They are high in demand & have strong customer loyalty' },
-      { id: 'all', label: 'All', subtitle: 'It includes all verified astrologers, hired after 5 rounds of interviews' },
-    ],
-  };
+  'Sort by': [
+    { id: 'popularity', label: 'Popularity' },
+    { id: 'exp-high-low', label: 'Experience: High to Low' },
+    { id: 'exp-low-high', label: 'Experience: Low to High' },
+    { id: 'orders-high-low', label: 'Orders: High to Low' },
+    { id: 'orders-low-high', label: 'Orders: Low to High' },
+    { id: 'price-high-low', label: 'Price: High to Low' },
+    { id: 'price-low-high', label: 'Price: Low to High' },
+    { id: 'rating-high-low', label: 'Rating: High to Low' },
+  ],
+  'Skill': [
+    { id: 'vedic', label: 'Vedic' },
+    { id: 'tarot', label: 'Tarot' },
+    { id: 'numerology', label: 'Numerology' },
+    { id: 'palmistry', label: 'Palmistry' },
+    { id: 'face-reading', label: 'Face Reading' },
+    { id: 'kp', label: 'KP' },
+    { id: 'life-coach', label: 'Life Coach' },
+    { id: 'nadi', label: 'Nadi' },
+    { id: 'prashana', label: 'Prashana' },
+    { id: 'psychic', label: 'Psychic' },
+  ],
+  'Language': [
+    { id: 'english', label: 'English' },
+    { id: 'hindi', label: 'Hindi' },
+    { id: 'bengali', label: 'Bengali' },
+    { id: 'gujarati', label: 'Gujarati' },
+    { id: 'kannada', label: 'Kannada' },
+    { id: 'malayalam', label: 'Malayalam' },
+    { id: 'marathi', label: 'Marathi' },
+    { id: 'punjabi', label: 'Punjabi' },
+    { id: 'tamil', label: 'Tamil' },
+  ],
+  'Gender': [
+    { id: 'male', label: 'Male' },
+    { id: 'female', label: 'Female' },
+  ],
+  'Country': [
+    { id: 'india', label: 'India' },
+    { id: 'outside-india', label: 'Outside India' },
+  ],
+  'Top Astrologers': [
+    { id: 'celebrity', label: 'Celebrity', subtitle: 'They have the highest fan following & people are crazy about them' },
+    { id: 'top-choice', label: 'Top Choice', subtitle: 'If you talk to them once, you are their customer for life' },
+    { id: 'rising-star', label: 'Rising Star', subtitle: 'They are high in demand & have strong customer loyalty' },
+    { id: 'all', label: 'All', subtitle: 'It includes all verified astrologers, hired after 5 rounds of interviews' },
+  ],
+};
+
 
   // Badge colors
   const getBadgeStyle = (badge) => {
@@ -141,75 +142,130 @@ const Chat = ({ navigation }) => {
     }
   };
 
-  // Load astrologers from API
-  const loadAstrologers = async (refresh = false) => {
-    try {
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const params = {
-        page: 1,
-        limit: 20,
-        sortBy: getSortByParam(),
-      };
-
-      if (activeTab !== 'All' && activeTab !== 'Filter') {
-        params.specialization = activeTab.toLowerCase();
-      }
-
-      if (selectedFilters.skills.length > 0) {
-        params.specialization = selectedFilters.skills.join(',');
-      }
-
-      if (selectedFilters.languages.length > 0) {
-        params.language = selectedFilters.languages.join(',');
-      }
-
-      const response = await astrologerService.getAstrologers(params);
-
-      if (response.success) {
-        const formattedData = response.data.astrologers.map((astro, idx) => {
-          // Auto-assign badges based on performance (simulated)
-          let badge = null;
-          const rating = astro.ratings?.average || 0;
-          const orders = astro.ratings?.count || 0;
-          
-          if (rating >= 4.8 && orders > 5000) badge = 'celebrity';
-          else if (rating >= 4.5 && orders > 2000) badge = 'top-choice';
-          else if (rating >= 4.2 && orders > 500) badge = 'rising-star';
-
-          return {
-            id: astro._id,
-            name: astro.name,
-            skills: astro.specializations || [],
-            lang: astro.languages?.slice(0, 2).join(', ') || 'English',
-            exp: astro.experienceYears || 0,
-            price: astro.pricing?.chat || 25,
-            oldPrice: astro.pricing?.chat ? Math.round(astro.pricing.chat * 1.22) : 30,
-            orders: astro.ratings?.count || 0,
-            rating: astro.ratings?.average || 5,
-            image: astro.profilePicture || 'https://i.pravatar.cc/100',
-            isOnline: astro.availability?.isOnline || false,
-            isAvailable: astro.availability?.isAvailable || false,
-            isBusy: !astro.availability?.isAvailable && astro.availability?.isOnline,
-            waitTime: !astro.availability?.isAvailable && astro.availability?.isOnline ? Math.floor(Math.random() * 20) + 5 : 0,
-            badge,
-          };
-        });
-
-        setAstrologers(formattedData);
-      }
-    } catch (error) {
-      console.error('Load astrologers error:', error);
-      Alert.alert('Error', 'Failed to load astrologers');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  // Update the loadAstrologers function
+const loadAstrologers = async (refresh = false) => {
+  try {
+    if (refresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
     }
+
+    // Build search params from filters
+    const params = {
+      page: 1,
+      limit: 20,
+      sortBy: mapSortByToAPI(selectedFilters.sortBy),
+    };
+
+    // Handle specialization from tab or filter
+    if (activeTab !== 'All' && activeTab !== 'Filter') {
+      params.skills = [activeTab.toLowerCase()];
+    } else if (selectedFilters.skills.length > 0) {
+      params.skills = selectedFilters.skills;
+    }
+
+    // Apply other filters
+    if (selectedFilters.languages.length > 0) {
+      params.languages = selectedFilters.languages;
+    }
+
+    if (selectedFilters.genders.length > 0) {
+      params.genders = selectedFilters.genders;
+    }
+
+    if (selectedFilters.countries.length > 0) {
+      params.countries = selectedFilters.countries;
+    }
+
+    if (selectedFilters.topAstrologers.length > 0) {
+      params.topAstrologers = selectedFilters.topAstrologers;
+    }
+
+    console.log('🔍 Loading astrologers with params:', params);
+
+    const response = await astrologerService.searchAstrologers(params);
+    
+    // ✅ Add defensive checks
+    console.log('📦 Full response:', response);
+
+    if (response.success && response.data) {
+      // ✅ Handle array directly or from nested data property
+      const astrologersList = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.astrologers || [];
+      
+      console.log('📋 Astrologers list:', astrologersList);
+
+      const formattedData = astrologersList.map((astro, index) => {
+  // Auto-assign badges based on performance
+  let badge = null;
+  const rating = astro.ratings?.average || 0;
+  const orders = astro.stats?.totalOrders || 0;
+  
+  if (rating >= 4.8 && orders > 1000) badge = 'celebrity';
+  else if (rating >= 4.5 && orders > 500) badge = 'top-choice';
+  else if (rating >= 4.3 && orders > 100) badge = 'rising-star';
+
+  // ✅ FIX: Properly extract the ID as a string
+  const astrologerId = astro._id?.toString() || astro.id?.toString() || `astro-${index}`;
+
+  return {
+    id: astrologerId, // ✅ Add fallback ID
+    name: astro.name,
+    skills: astro.specializations || [],
+    lang: astro.languages?.slice(0, 2).join(', ') || 'English',
+    exp: astro.experienceYears || 0,
+    price: astro.pricing?.call || 35, // ✅ Use call price for Call screen
+    oldPrice: astro.pricing?.call ? Math.round(astro.pricing.call * 1.22) : 42,
+    orders: astro.stats?.totalOrders || 0,
+    rating: astro.ratings?.average || 5,
+    image: astro.profilePicture || 'https://i.pravatar.cc/100',
+    isOnline: astro.availability?.isOnline || false,
+    isAvailable: astro.availability?.isAvailable || false,
+    isBusy: !astro.availability?.isAvailable && astro.availability?.isOnline,
+    waitTime: !astro.availability?.isAvailable && astro.availability?.isOnline 
+      ? Math.floor(Math.random() * 20) + 5 
+      : 0,
+    badge,
   };
+});
+
+      setAstrologers(formattedData);
+      console.log('✅ Loaded', formattedData.length, 'astrologers');
+    } else {
+      console.warn('⚠️ No data in response or request failed');
+      setAstrologers([]);
+    }
+  } catch (error) {
+    console.error('❌ Load astrologers error:', error);
+    console.error('Error details:', error.response?.data);
+    Alert.alert('Error', 'Failed to load astrologers');
+    setAstrologers([]);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
+
+// Add helper function to map UI sort labels to API enum values
+const mapSortByToAPI = (sortLabel) => {
+  const sortMap = {
+    'Popularity': 'popularity',
+    'Experience: High to Low': 'exp-high-low',
+    'Experience: Low to High': 'exp-low-high',
+    'Orders: High to Low': 'orders-high-low',
+    'Orders: Low to High': 'orders-low-high',
+    'Price: High to Low': 'price-high-low',
+    'Price: Low to High': 'price-low-high',
+    'Rating: High to Low': 'rating-high-low',
+  };
+  return sortMap[sortLabel] || 'popularity';
+};
+
+// Remove the old getSortByParam function as it's no longer needed
+
 
   const getSortByParam = () => {
     const sortMap = {
@@ -324,126 +380,137 @@ const Chat = ({ navigation }) => {
   );
 
   // Render astrologer card
-  const renderAstrologer = ({ item }) => {
-    const badgeStyle = item.badge ? getBadgeStyle(item.badge) : null;
-    const displaySkills = item.skills.slice(0, 2).join(', ');
+const renderAstrologer = ({ item }) => {
+  const badgeStyle = item.badge ? getBadgeStyle(item.badge) : null;
+  const displaySkills = item.skills.slice(0, 2).join(', ');
 
-    return (
-      <View style={styles.card}>
-        {/* Badge */}
-        {badgeStyle && (
-          <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
-            <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
-              {item.badge.replace('-', ' ').toUpperCase()}
-            </Text>
-          </View>
-        )}
+  return (
+    <TouchableOpacity 
+      style={styles.card}
+      onPress={() => navigation.navigate('AstrologerProfile', { 
+        astrologerId: item.id.toString()
+      })}
+      activeOpacity={0.7}
+    >
+      {/* Badge */}
+      {badgeStyle && (
+        <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
+          <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
+            {item.badge.replace('-', ' ').toUpperCase()}
+          </Text>
+        </View>
+      )}
 
-        <Image source={{ uri: item.image }} style={styles.avatar} />
+      <Image source={{ uri: item.image }} style={styles.avatar} />
 
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.name}>{item.name}</Text>
-            {item.isOnline && <View style={styles.onlineDot} />}
-          </View>
-          <Text style={styles.sub} numberOfLines={1}>{displaySkills}</Text>
-          <Text style={styles.sub}>{item.lang}</Text>
-          <Text style={styles.sub}>Exp: {item.exp} Years</Text>
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.name}>{item.name}</Text>
+          {item.isOnline && <View style={styles.onlineDot} />}
+        </View>
+        <Text style={styles.sub} numberOfLines={1}>{displaySkills}</Text>
+        <Text style={styles.sub}>{item.lang}</Text>
+        <Text style={styles.sub}>Exp: {item.exp} Years</Text>
 
-          {/* Stars + Orders below image */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-            <Text style={styles.stars}>{'⭐'.repeat(Math.round(item.rating))}</Text>
-            <Text style={styles.orders}> {item.orders} orders</Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center' }}>
-            {item.oldPrice && <Text style={styles.oldPrice}>₹{item.oldPrice}</Text>}
-            <Text style={styles.price}>₹{item.price}/min</Text>
-          </View>
+        {/* Stars + Orders below image */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Text style={styles.stars}>{'⭐'.repeat(Math.round(item.rating))}</Text>
+          <Text style={styles.orders}> {item.orders} orders</Text>
         </View>
 
-        {/* Verified Tick */}
-        <View style={styles.tickContainer}>
-          <Image source={require('../../assets/check.png')} style={styles.tickIcon} />
+        <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center' }}>
+          {item.oldPrice && <Text style={styles.oldPrice}>₹{item.oldPrice}</Text>}
+          <Text style={styles.price}>₹{item.price}/min</Text>
         </View>
-
-        {/* chat Button or Wait Time */}
-        {item.isBusy ? (
-          <View style={styles.waitContainer}>
-            <MaterialIcons name="schedule" size={16} color="#FF9800" />
-            <Text style={styles.waitText}>Wait ~{item.waitTime}m</Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.chatBtn, !item.isAvailable && styles.chatBtnDisabled]}
-            onPress={() => handleChatPress(item)}
-            disabled={!item.isAvailable || processingOrder}
-          >
-            {processingOrder ? (
-              <ActivityIndicator size="small" color="green" />
-            ) : (
-              <Text style={[styles.chatText, !item.isAvailable && styles.chatTextDisabled]}>
-                {item.isAvailable ? 'Chat' : 'Offline'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
       </View>
-    );
-  };
+
+      {/* Verified Tick */}
+      <View style={styles.tickContainer}>
+        <Image source={require('../../assets/check.png')} style={styles.tickIcon} />
+      </View>
+
+      {/* Chat Button or Wait Time */}
+      {item.isBusy ? (
+        <View style={styles.waitContainer}>
+          <MaterialIcons name="schedule" size={16} color="#FF9800" />
+          <Text style={styles.waitText}>Wait ~{item.waitTime}m</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.chatBtn, !item.isAvailable && styles.chatBtnDisabled]}
+          onPress={(e) => {
+            e.stopPropagation(); // ✅ Prevent card click when pressing chat
+            handleChatPress(item);
+          }}
+          disabled={!item.isAvailable || processingOrder}
+        >
+          {processingOrder ? (
+            <ActivityIndicator size="small" color="green" />
+          ) : (
+            <Text style={[styles.chatText, !item.isAvailable && styles.chatTextDisabled]}>
+              {item.isAvailable ? 'Chat' : 'Offline'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+};
+
 
   // Render filter content
-  const renderFilterContent = () => {
-    const items = filterSections[selectedSection] || [];
-    
-    return (
-      <ScrollView style={styles.filterContentScroll}>
-        {selectedSection !== 'Sort by' && (
-          <View style={styles.filterHeader}>
-            <TouchableOpacity onPress={() => {
-              const key = selectedSection.toLowerCase().replace(' ', '');
-              const allIds = items.map(i => i.id);
-              setSelectedFilters(prev => ({ ...prev, [key]: allIds }));
-            }}>
-              <Text style={styles.selectAllText}>Select all</Text>
-            </TouchableOpacity>
-            <Text style={styles.separator}>  -  </Text>
-            <TouchableOpacity onPress={() => {
-              const key = selectedSection.toLowerCase().replace(' ', '');
-              setSelectedFilters(prev => ({ ...prev, [key]: [] }));
-            }}>
-              <Text style={styles.clearText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        {items.map(item => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.filterOption}
-            onPress={() => toggleFilter(selectedSection, item.id)}
-          >
-            <View style={styles.filterOptionContent}>
-              <View style={[
-                styles.checkbox,
-                isFilterSelected(selectedSection, item.id) && styles.checkboxSelected
-              ]}>
-                {isFilterSelected(selectedSection, item.id) && (
-                  <Ionicons name="checkmark" size={18} color="#fff" />
-                )}
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.filterOptionText}>{item.label}</Text>
-                {item.subtitle && (
-                  <Text style={styles.filterOptionSubtitle}>{item.subtitle}</Text>
-                )}
-              </View>
-            </View>
+const renderFilterContent = () => {
+  const items = filterSections[selectedSection] || [];
+  
+  return (
+    <ScrollView style={styles.filterContentScroll}>
+      {selectedSection !== 'Sort by' && (
+        <View style={styles.filterHeader}>
+          <TouchableOpacity onPress={() => {
+            const key = selectedSection.toLowerCase().replace(' ', '');
+            const allIds = items.map(i => i.id);
+            setSelectedFilters(prev => ({ ...prev, [key]: allIds }));
+          }}>
+            <Text style={styles.selectAllText}>Select all</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-    );
-  };
+          <Text style={styles.separator}>  -  </Text>
+          <TouchableOpacity onPress={() => {
+            const key = selectedSection.toLowerCase().replace(' ', '');
+            setSelectedFilters(prev => ({ ...prev, [key]: [] }));
+          }}>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {items.map((item, index) => ( // ✅ Add index as fallback
+        <TouchableOpacity
+          key={`${selectedSection}-${item.id}-${index}`} // ✅ Make key more unique
+          style={styles.filterOption}
+          onPress={() => toggleFilter(selectedSection, item.id)}
+        >
+          <View style={styles.filterOptionContent}>
+            <View style={[
+              styles.checkbox,
+              isFilterSelected(selectedSection, item.id) && styles.checkboxSelected
+            ]}>
+              {isFilterSelected(selectedSection, item.id) && (
+                <Ionicons name="checkmark" size={18} color="#fff" />
+              )}
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.filterOptionText}>{item.label}</Text>
+              {item.subtitle && (
+                <Text style={styles.filterOptionSubtitle}>{item.subtitle}</Text>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+};
+
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -490,7 +557,7 @@ const Chat = ({ navigation }) => {
               horizontal
               data={recentOrders}
               renderItem={renderRecentOrder}
-              keyExtractor={item => item.id}
+              keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
               showsHorizontalScrollIndicator={false}
               style={{ marginTop: 10 }}
             />
@@ -504,20 +571,21 @@ const Chat = ({ navigation }) => {
         )}
 
         {/* Category Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRow}>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[styles.tabButton, activeTab === cat.id && styles.activeTabButton]}
-              onPress={() => cat.id === 'Filter' ? setFilterVisible(true) : setActiveTab(cat.id)}
-            >
-              {cat.id === 'Filter' && <Feather name="sliders" size={16} color={activeTab === cat.id ? '#000' : '#666'} style={{ marginRight: 6 }} />}
-              <Text style={[styles.tabText, activeTab === cat.id && styles.activeTabText]}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRow}>
+  {categories.map((cat, index) => ( // ✅ Add index
+    <TouchableOpacity
+      key={`category-${cat.id}-${index}`} // ✅ Make key more unique
+      style={[styles.tabButton, activeTab === cat.id && styles.activeTabButton]}
+      onPress={() => cat.id === 'Filter' ? setFilterVisible(true) : setActiveTab(cat.id)}
+    >
+      {cat.id === 'Filter' && <Feather name="sliders" size={16} color={activeTab === cat.id ? '#000' : '#666'} style={{ marginRight: 6 }} />}
+      <Text style={[styles.tabText, activeTab === cat.id && styles.activeTabText]}>
+        {cat.label}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
+
 
         {/* Astrologer List */}
         {loading ? (
@@ -526,7 +594,7 @@ const Chat = ({ navigation }) => {
           <FlatList
             data={astrologers}
             renderItem={renderAstrologer}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
             scrollEnabled={false}
             refreshing={refreshing}
             onRefresh={() => {
@@ -555,30 +623,31 @@ const Chat = ({ navigation }) => {
             </View>
 
             <View style={styles.filterBody}>
-              <View style={styles.filterSidebar}>
-                {Object.keys(filterSections).map(section => (
-                  <TouchableOpacity
-                    key={section}
-                    style={[
-                      styles.filterSidebarItem,
-                      selectedSection === section && styles.filterSidebarItemActive,
-                    ]}
-                    onPress={() => setSelectedSection(section)}
-                  >
-                    <Text
-                      style={[
-                        styles.filterSidebarText,
-                        selectedSection === section && styles.filterSidebarTextActive,
-                      ]}
-                    >
-                      {section}
-                    </Text>
-                    {(selectedFilters[section.toLowerCase().replace(' ', '')] || []).length > 0 && (
-                      <View style={styles.filterDot} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+<View style={styles.filterSidebar}>
+  {Object.keys(filterSections).map((section, index) => ( // ✅ Add index
+    <TouchableOpacity
+      key={`sidebar-${section}-${index}`} // ✅ Make key more unique
+      style={[
+        styles.filterSidebarItem,
+        selectedSection === section && styles.filterSidebarItemActive,
+      ]}
+      onPress={() => setSelectedSection(section)}
+    >
+      <Text
+        style={[
+          styles.filterSidebarText,
+          selectedSection === section && styles.filterSidebarTextActive,
+        ]}
+      >
+        {section}
+      </Text>
+      {(selectedFilters[section.toLowerCase().replace(' ', '')] || []).length > 0 && (
+        <View style={styles.filterDot} />
+      )}
+    </TouchableOpacity>
+  ))}
+</View>
+
 
               <View style={styles.filterContent}>
                 {renderFilterContent()}

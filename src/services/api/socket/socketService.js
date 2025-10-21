@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Socket URL - Update this to match your backend
-const SOCKET_URL = 'http://192.168.31.204:3001';
+const SOCKET_URL = 'http://192.168.1.10:3001';
 
 console.log('🌍 Socket URL:', SOCKET_URL);
 
@@ -22,378 +22,12 @@ class SocketService {
   // ============================================
   // CHAT NAMESPACE (/chat)
   // ============================================
-
-  /**
-   * Initialize chat socket connection
-   * Namespace: /chat
-   * Authentication: JWT token in auth header
-   */
-  async initializeChatSocket() {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-
-      if (!token) {
-        throw new Error('No access token found for chat socket');
-      }
-
-      console.log('📡 Initializing chat socket...');
-
-      this.chatSocket = io(`${SOCKET_URL}/chat`, {
-        auth: {
-          token, // JWT token for authentication
-        },
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-      });
-
-      // Connection events
-      this.chatSocket.on('connect', () => {
-        console.log('✅ Chat socket connected:', this.chatSocket.id);
-      });
-
-      this.chatSocket.on('disconnect', (reason) => {
-        console.log('❌ Chat socket disconnected:', reason);
-      });
-
-      this.chatSocket.on('connect_error', (error) => {
-        console.error('❌ Chat socket connection error:', error.message);
-      });
-
-      this.chatSocket.on('error', (error) => {
-        console.error('❌ Chat socket error:', error);
-      });
-
-      return this.chatSocket;
-    } catch (error) {
-      console.error('❌ Failed to initialize chat socket:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Join a chat session
-   * Event: join_session
-   * 
-   * @param {string} sessionId - Chat session ID (e.g., 'CHAT_20251008_ABC123')
-   * @param {string} userId - Current user ID
-   * @param {string} role - User role ('user' or 'astrologer')
-   */
-  joinChatSession(sessionId, userId, role = 'user') {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    console.log('📡 Joining chat session:', sessionId);
-
-    this.chatSocket.emit('join_session', {
-      sessionId,
-      userId,
-      role,
-    });
-  }
-
-  /**
-   * Send a message in chat
-   * Event: send_message
-   * 
-   * @param {Object} messageData - Message data
-   * @param {string} messageData.sessionId - Chat session ID
-   * @param {string} messageData.senderId - Sender user ID
-   * @param {string} messageData.senderModel - 'User' or 'Astrologer'
-   * @param {string} messageData.receiverId - Receiver ID
-   * @param {string} messageData.receiverModel - 'User' or 'Astrologer'
-   * @param {string} messageData.type - Message type: 'text' | 'image' | 'audio'
-   * @param {string} messageData.content - Message content
-   */
-  sendMessage(messageData) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    console.log('📤 Sending message:', messageData.type);
-
-    this.chatSocket.emit('send_message', {
-      sessionId: messageData.sessionId,
-      senderId: messageData.senderId,
-      senderModel: messageData.senderModel || 'User',
-      receiverId: messageData.receiverId,
-      receiverModel: messageData.receiverModel || 'Astrologer',
-      type: messageData.type || 'text',
-      content: messageData.content,
-    });
-  }
-
-  /**
-   * Send typing indicator
-   * Event: typing
-   * 
-   * @param {string} sessionId - Chat session ID
-   * @param {string} userId - Current user ID
-   * @param {boolean} isTyping - Typing status
-   */
-  sendTypingStatus(sessionId, userId, isTyping) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    this.chatSocket.emit('typing', {
-      sessionId,
-      userId,
-      isTyping,
-    });
-  }
-
-  /**
-   * Mark messages as read
-   * Event: mark_read
-   * 
-   * @param {string} sessionId - Chat session ID
-   * @param {string} userId - Current user ID
-   * @param {Array<string>} messageIds - Array of message IDs to mark as read
-   */
-  markMessagesRead(sessionId, userId, messageIds) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    console.log('📬 Marking messages as read:', messageIds.length);
-
-    this.chatSocket.emit('mark_read', {
-      sessionId,
-      userId,
-      messageIds,
-    });
-  }
-
-  /**
-   * Listen for new messages
-   * Event: new_message
-   * 
-   * @param {Function} callback - Callback function(data)
-   * data: { messageId, senderId, senderModel, type, content, sentAt, isRead }
-   */
-  onNewMessage(callback) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    this.chatSocket.on('new_message', (data) => {
-      console.log('📨 New message received:', data.messageId);
-      callback(data);
-    });
-  }
-
-  /**
-   * Listen for typing status
-   * Event: user_typing
-   * 
-   * @param {Function} callback - Callback function(data)
-   * data: { userId, userName, isTyping }
-   */
-  onUserTyping(callback) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    this.chatSocket.on('user_typing', (data) => {
-      console.log('✍️ User typing:', data.userName, data.isTyping);
-      callback(data);
-    });
-  }
-
-  /**
-   * Listen for messages read event
-   * Event: messages_read
-   * 
-   * @param {Function} callback - Callback function(data)
-   * data: { messageIds, userId }
-   */
-  onMessagesRead(callback) {
-    if (!this.chatSocket) {
-      console.error('❌ Chat socket not initialized');
-      return;
-    }
-
-    this.chatSocket.on('messages_read', (data) => {
-      console.log('📬 Messages read:', data.messageIds.length);
-      callback(data);
-    });
-  }
-
-  /**
-   * Disconnect chat socket
-   */
-  disconnectChat() {
-    if (this.chatSocket) {
-      this.chatSocket.disconnect();
-      this.chatSocket = null;
-      console.log('✅ Chat socket disconnected');
-    }
-  }
+  // ... (keep all your existing chat methods)
 
   // ============================================
   // CALL NAMESPACE (/call)
   // ============================================
-
-  /**
-   * Initialize call socket connection
-   * Namespace: /call
-   */
-  async initializeCallSocket() {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-
-      if (!token) {
-        throw new Error('No access token found for call socket');
-      }
-
-      console.log('📡 Initializing call socket...');
-
-      this.callSocket = io(`${SOCKET_URL}/call`, {
-        auth: { token },
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-      });
-
-      this.callSocket.on('connect', () => {
-        console.log('✅ Call socket connected:', this.callSocket.id);
-      });
-
-      this.callSocket.on('disconnect', (reason) => {
-        console.log('❌ Call socket disconnected:', reason);
-      });
-
-      this.callSocket.on('error', (error) => {
-        console.error('❌ Call socket error:', error);
-      });
-
-      return this.callSocket;
-    } catch (error) {
-      console.error('❌ Failed to initialize call socket:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Join call room
-   * Event: join_room
-   * 
-   * @param {string} sessionId - Call session ID
-   * @param {string} userId - Current user ID
-   * @param {string} role - User role ('user' or 'astrologer')
-   */
-  joinCallRoom(sessionId, userId, role = 'user') {
-    if (!this.callSocket) {
-      console.error('❌ Call socket not initialized');
-      return;
-    }
-
-    console.log('📞 Joining call room:', sessionId);
-
-    this.callSocket.emit('join_room', {
-      sessionId,
-      userId,
-      role,
-    });
-  }
-
-  /**
-   * Send network quality update
-   * Event: network_quality
-   * 
-   * @param {string} sessionId - Call session ID
-   * @param {string} userId - Current user ID
-   * @param {number} quality - Network quality (1-5)
-   */
-  sendNetworkQuality(sessionId, userId, quality) {
-    if (!this.callSocket) {
-      console.error('❌ Call socket not initialized');
-      return;
-    }
-
-    this.callSocket.emit('network_quality', {
-      sessionId,
-      userId,
-      quality,
-    });
-  }
-
-  /**
-   * Listen for incoming call
-   * Event: incoming_call
-   * 
-   * @param {Function} callback - Callback function(data)
-   * data: { sessionId, callerId, callerName, callerProfilePicture, callType }
-   */
-  onIncomingCall(callback) {
-    if (!this.callSocket) {
-      console.error('❌ Call socket not initialized');
-      return;
-    }
-
-    this.callSocket.on('incoming_call', (data) => {
-      console.log('📞 Incoming call from:', data.callerName);
-      callback(data);
-    });
-  }
-
-  /**
-   * Listen for call accepted
-   * Event: call_accepted
-   * 
-   * @param {Function} callback - Callback function(data)
-   */
-  onCallAccepted(callback) {
-    if (!this.callSocket) {
-      console.error('❌ Call socket not initialized');
-      return;
-    }
-
-    this.callSocket.on('call_accepted', (data) => {
-      console.log('✅ Call accepted');
-      callback(data);
-    });
-  }
-
-  /**
-   * Listen for call ended
-   * Event: call_ended
-   * 
-   * @param {Function} callback - Callback function(data)
-   * data: { sessionId, duration, totalAmount, reason }
-   */
-  onCallEnded(callback) {
-    if (!this.callSocket) {
-      console.error('❌ Call socket not initialized');
-      return;
-    }
-
-    this.callSocket.on('call_ended', (data) => {
-      console.log('📞 Call ended. Duration:', data.duration, 'seconds');
-      callback(data);
-    });
-  }
-
-  /**
-   * Disconnect call socket
-   */
-  disconnectCall() {
-    if (this.callSocket) {
-      this.callSocket.disconnect();
-      this.callSocket = null;
-      console.log('✅ Call socket disconnected');
-    }
-  }
+  // ... (keep all your existing call methods)
 
   // ============================================
   // STREAM NAMESPACE (/stream)
@@ -415,10 +49,11 @@ class SocketService {
 
       this.streamSocket = io(`${SOCKET_URL}/stream`, {
         auth: { token },
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'], // ✅ Support both transports
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 5,
+        timeout: 10000, // ✅ Add timeout
       });
 
       this.streamSocket.on('connect', () => {
@@ -429,8 +64,17 @@ class SocketService {
         console.log('❌ Stream socket disconnected:', reason);
       });
 
+      this.streamSocket.on('connect_error', (error) => {
+        console.error('❌ Stream socket connection error:', error.message);
+      });
+
       this.streamSocket.on('error', (error) => {
         console.error('❌ Stream socket error:', error);
+      });
+
+      // ✅ NEW: Listen for stream joined confirmation
+      this.streamSocket.on('stream_joined', (data) => {
+        console.log('✅ Stream joined confirmed:', data);
       });
 
       return this.streamSocket;
@@ -446,18 +90,22 @@ class SocketService {
    * 
    * @param {string} streamId - Stream ID
    * @param {string} userId - Current user ID
+   * @param {string} userName - User name (✅ NEW)
+   * @param {string} role - User role: 'viewer' or 'host' (✅ NEW)
    */
-  joinStream(streamId, userId) {
+  joinStream(streamId, userId, userName = 'User', role = 'viewer') {
     if (!this.streamSocket) {
       console.error('❌ Stream socket not initialized');
       return;
     }
 
-    console.log('📺 Joining stream:', streamId);
+    console.log('📺 Joining stream:', streamId, 'as', role);
 
     this.streamSocket.emit('join_stream', {
       streamId,
       userId,
+      userName, // ✅ Include userName
+      role,     // ✅ Include role
     });
   }
 
@@ -469,10 +117,11 @@ class SocketService {
    * @param {string} userId - Current user ID
    * @param {string} userName - User name
    * @param {string} comment - Comment text
+   * @param {string} userAvatar - User avatar URL (✅ NEW - optional)
    */
-  sendStreamComment(streamId, userId, userName, comment) {
+  sendStreamComment(streamId, userId, userName, comment, userAvatar = null) {
     if (!this.streamSocket) {
-      console.error('❌ Stream socket not initialized');
+      console.warn('⚠️ Stream socket not initialized, cannot send comment');
       return;
     }
 
@@ -482,7 +131,9 @@ class SocketService {
       streamId,
       userId,
       userName,
+      userAvatar, // ✅ Include avatar
       comment,
+      timestamp: new Date().toISOString(), // ✅ Add timestamp
     });
   }
 
@@ -492,16 +143,21 @@ class SocketService {
    * 
    * @param {string} streamId - Stream ID
    * @param {string} userId - Current user ID
+   * @param {string} userName - User name (✅ NEW)
    */
-  sendStreamLike(streamId, userId) {
+  sendStreamLike(streamId, userId, userName = 'User') {
     if (!this.streamSocket) {
-      console.error('❌ Stream socket not initialized');
+      console.warn('⚠️ Stream socket not initialized, cannot send like');
       return;
     }
+
+    console.log('❤️ Sending like');
 
     this.streamSocket.emit('send_like', {
       streamId,
       userId,
+      userName, // ✅ Include userName
+      timestamp: new Date().toISOString(), // ✅ Add timestamp
     });
   }
 
@@ -513,11 +169,12 @@ class SocketService {
    * @param {string} userId - Current user ID
    * @param {string} userName - User name
    * @param {string} giftType - Gift type (e.g., 'rose', 'diamond')
+   * @param {string} giftName - Gift display name (✅ NEW)
    * @param {number} amount - Gift amount
    */
-  sendStreamGift(streamId, userId, userName, giftType, amount) {
+  sendStreamGift(streamId, userId, userName, giftType, giftName, amount) {
     if (!this.streamSocket) {
-      console.error('❌ Stream socket not initialized');
+      console.warn('⚠️ Stream socket not initialized, cannot send gift');
       return;
     }
 
@@ -528,13 +185,18 @@ class SocketService {
       userId,
       userName,
       giftType,
+      giftName,  // ✅ Add gift name
       amount,
+      timestamp: new Date().toISOString(), // ✅ Add timestamp
     });
   }
 
   /**
    * Listen for new comments
    * Event: new_comment
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, userAvatar, comment, timestamp }
    */
   onNewComment(callback) {
     if (!this.streamSocket) {
@@ -551,6 +213,9 @@ class SocketService {
   /**
    * Listen for new likes
    * Event: new_like
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, timestamp }
    */
   onNewLike(callback) {
     if (!this.streamSocket) {
@@ -567,6 +232,9 @@ class SocketService {
   /**
    * Listen for new gifts
    * Event: new_gift
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, giftType, giftName, amount, timestamp }
    */
   onNewGift(callback) {
     if (!this.streamSocket) {
@@ -581,8 +249,49 @@ class SocketService {
   }
 
   /**
+   * ✅ NEW: Listen for viewer joined
+   * Event: viewer_joined
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, timestamp }
+   */
+  onViewerJoined(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('viewer_joined', (data) => {
+      console.log('👋 Viewer joined:', data.userName);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for viewer left
+   * Event: viewer_left
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, timestamp }
+   */
+  onViewerLeft(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('viewer_left', (data) => {
+      console.log('👋 Viewer left:', data.userName);
+      callback(data);
+    });
+  }
+
+  /**
    * Listen for viewer count updates
    * Event: viewer_count_updated
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { count, streamId }
    */
   onViewerCountUpdated(callback) {
     if (!this.streamSocket) {
@@ -593,6 +302,122 @@ class SocketService {
     this.streamSocket.on('viewer_count_updated', (data) => {
       console.log('👥 Viewers:', data.count);
       callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for call accepted event
+   * Event: call_accepted
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, userName, callType, callMode }
+   */
+  onCallAcceptedInStream(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('call_accepted', (data) => {
+      console.log('✅ Call accepted in stream:', data);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for call rejected event
+   * Event: call_rejected
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { userId, reason }
+   */
+  onCallRejectedInStream(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('call_rejected', (data) => {
+      console.log('❌ Call rejected in stream:', data);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for host mic toggle
+   * Event: host_mic_toggled
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { streamId, enabled }
+   */
+  onHostMicToggled(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('host_mic_toggled', (data) => {
+      console.log('🎤 Host mic toggled:', data.enabled);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for host camera toggle
+   * Event: host_camera_toggled
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { streamId, enabled }
+   */
+  onHostCameraToggled(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('host_camera_toggled', (data) => {
+      console.log('📹 Host camera toggled:', data.enabled);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Listen for stream state changes
+   * Event: stream_state_changed
+   * 
+   * @param {Function} callback - Callback function(data)
+   * data: { streamId, state }
+   */
+  onStreamStateChanged(callback) {
+    if (!this.streamSocket) {
+      console.error('❌ Stream socket not initialized');
+      return;
+    }
+
+    this.streamSocket.on('stream_state_changed', (data) => {
+      console.log('📊 Stream state changed:', data.state);
+      callback(data);
+    });
+  }
+
+  /**
+   * ✅ NEW: Leave stream room
+   * Event: leave_stream
+   * 
+   * @param {string} streamId - Stream ID
+   * @param {string} userId - Current user ID
+   */
+  leaveStream(streamId, userId) {
+    if (!this.streamSocket) {
+      console.warn('⚠️ Stream socket not initialized');
+      return;
+    }
+
+    console.log('👋 Leaving stream:', streamId);
+
+    this.streamSocket.emit('leave_stream', {
+      streamId,
+      userId,
     });
   }
 
@@ -651,6 +476,26 @@ class SocketService {
       call: this.isCallConnected(),
       stream: this.isStreamConnected(),
     };
+  }
+
+  /**
+   * ✅ NEW: Remove all stream event listeners
+   */
+  removeStreamListeners() {
+    if (this.streamSocket) {
+      this.streamSocket.removeAllListeners('new_comment');
+      this.streamSocket.removeAllListeners('new_like');
+      this.streamSocket.removeAllListeners('new_gift');
+      this.streamSocket.removeAllListeners('viewer_joined');
+      this.streamSocket.removeAllListeners('viewer_left');
+      this.streamSocket.removeAllListeners('viewer_count_updated');
+      this.streamSocket.removeAllListeners('call_accepted');
+      this.streamSocket.removeAllListeners('call_rejected');
+      this.streamSocket.removeAllListeners('host_mic_toggled');
+      this.streamSocket.removeAllListeners('host_camera_toggled');
+      this.streamSocket.removeAllListeners('stream_state_changed');
+      console.log('✅ Stream listeners removed');
+    }
   }
 }
 

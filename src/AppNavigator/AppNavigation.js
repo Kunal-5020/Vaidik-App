@@ -34,6 +34,8 @@ import ChatSopport from '../screens/ChatSupport';
 import BuyMembership from '../screens/SidebarScreens/BuyMembership';
 import LiveStreamScreen from '../screens/tab/Live';
 
+import AstrologerProfileScreen from '../screens/AstrologerProfileScreen';
+
 // ADD AUTH PROVIDER IMPORT
 import { AuthProvider } from '../context/AuthContext';
 
@@ -64,6 +66,11 @@ const AppNavigation = () => {
         />
         <Stack.Screen name="Profile" component={Profile} />
         <Stack.Screen name="AddCash" component={AddCash} />
+        <Stack.Screen 
+  name="AstrologerProfile" 
+  component={AstrologerProfileScreen}
+  options={{ headerShown: false }}
+/>  
         <Stack.Screen name="PaymentInfo" component={PaymentInfo} />
         <Stack.Screen name="Explore" component={ExploreScreen} />
         <Stack.Screen name="Details" component={Details} />
