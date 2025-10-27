@@ -27,26 +27,37 @@ const WalletScreen = ({ navigation }) => {
 
   // Load wallet data
   const loadWalletData = async (refresh = false) => {
-    try {
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+  try {
+    if (refresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-      // Load wallet balance
-      const statsResponse = await walletService.getWalletStats();
-      if (statsResponse.success) {
-        setWalletBalance(statsResponse.data.currentBalance || 0);
-      }
+    // Load wallet balance
+    const statsResponse = await walletService.getWalletStats();
+    if (statsResponse.success) {
+      setWalletBalance(statsResponse.data.currentBalance || 0);
+    }
 
-      // Load transactions or payment logs based on active tab
-      if (activeTab === 'transactions') {
-        const txnResponse = await walletService.getTransactions({ page: 1, limit: 50 });
-        if (txnResponse.success) {
-          const formattedTxns = txnResponse.data.transactions.map(txn => ({
+    // ✅ FIX: Load data based on active tab
+    if (activeTab === 'transactions') {
+      // Show ALL wallet transactions (credits + debits)
+      const txnResponse = await walletService.getTransactions({ 
+        page: 1, 
+        limit: 50 
+        // Don't filter by type - show everything
+      });
+      
+      if (txnResponse.success) {
+        const formattedTxns = txnResponse.data.transactions.map(txn => {
+          // Determine credit/debit based on transaction type
+          const creditTypes = ['recharge', 'refund', 'bonus'];
+          const isCredit = creditTypes.includes(txn.type);
+
+          return {
             id: txn._id,
-            title: txn.description || getTransactionTitle(txn),
+            title: getTransactionTitle(txn),
             date: new Date(txn.createdAt).toLocaleString('en-IN', {
               day: '2-digit',
               month: 'short',
@@ -56,17 +67,28 @@ const WalletScreen = ({ navigation }) => {
               hour12: true,
             }),
             txnId: `#${txn.transactionId || txn._id}`,
-            amount: txn.type === 'credit' ? `+₹${txn.amount}` : `-₹${txn.amount}`,
-            type: txn.type,
-          }));
-          setTransactions(formattedTxns);
-        }
-      } else {
-        const logsResponse = await walletService.getPaymentLogs({ page: 1, limit: 50 });
+            amount: isCredit 
+              ? `+₹${Math.abs(txn.amount).toFixed(0)}` 
+              : `-₹${Math.abs(txn.amount).toFixed(0)}`,
+            type: isCredit ? 'credit' : 'debit',
+            originalType: txn.type,
+            status: txn.status,
+          };
+        });
+        setTransactions(formattedTxns);
+      }
+    } else {
+      // Show payment gateway logs (recharge attempts only)
+      try {
+        const logsResponse = await walletService.getPaymentLogs({ 
+          page: 1, 
+          limit: 50 
+        });
+        
         if (logsResponse.success) {
           const formattedLogs = logsResponse.data.logs.map(log => ({
             id: log._id,
-            title: log.description || 'Payment',
+            title: log.description || `Wallet Recharge via ${log.paymentGateway || 'Gateway'}`,
             date: new Date(log.createdAt).toLocaleString('en-IN', {
               day: '2-digit',
               month: 'short',
@@ -76,37 +98,48 @@ const WalletScreen = ({ navigation }) => {
               hour12: true,
             }),
             txnId: `#${log.paymentId || log._id}`,
-            amount: `₹${log.amount}`,
+            amount: `₹${Math.abs(log.amount).toFixed(0)}`,
             status: log.status,
+            gateway: log.paymentGateway || 'N/A',
           }));
           setPaymentLogs(formattedLogs);
         }
+      } catch (error) {
+        console.error('Payment logs error:', error);
+        // If payment logs fail, show empty state
+        setPaymentLogs([]);
       }
-    } catch (error) {
-      console.error('Load wallet data error:', error);
-      Alert.alert('Error', 'Failed to load wallet data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error('Load wallet data error:', error);
+    Alert.alert('Error', error.message || 'Failed to load wallet data');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   // Helper function to generate transaction title
-  const getTransactionTitle = (txn) => {
-    switch (txn.type) {
-      case 'credit':
-        if (txn.reason === 'recharge') return 'Wallet Recharge';
-        if (txn.reason === 'refund') return 'Refund';
-        if (txn.reason === 'bonus') return 'Bonus Money';
-        return 'Credit';
-      case 'debit':
-        if (txn.reason === 'chat') return `Chat with Astrologer`;
-        if (txn.reason === 'call') return `Call with Astrologer`;
-        return 'Debit';
-      default:
-        return 'Transaction';
-    }
-  };
+const getTransactionTitle = (txn) => {
+  switch (txn.type) {
+    case 'recharge':
+      return `Wallet Recharge${txn.paymentGateway ? ` via ${txn.paymentGateway}` : ''}`;
+    case 'refund':
+      return 'Refund Received';
+    case 'bonus':
+      return 'Bonus Money Added';
+    case 'deduction':
+      // Parse description for context
+      const desc = txn.description?.toLowerCase() || '';
+      if (desc.includes('chat')) return 'Chat Payment';
+      if (desc.includes('call')) return 'Call Payment';
+      if (desc.includes('gift')) return 'Gift Sent';
+      if (desc.includes('stream')) return 'Live Stream';
+      return 'Payment Deducted';
+    default:
+      return txn.description || 'Transaction';
+  }
+};
 
   // Render transaction card
   const renderTransaction = ({ item }) => (
@@ -126,22 +159,35 @@ const WalletScreen = ({ navigation }) => {
 
   // Render payment log card
   const renderPaymentLog = ({ item }) => (
-    <View style={styles.card}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.cardDate}>{item.date}</Text>
-        <Text style={styles.cardTxn}>{item.txnId}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={styles.amount}>{item.amount}</Text>
-        <Text style={[styles.status, item.status === 'success' ? styles.statusSuccess : styles.statusFailed]}>
-          {item.status}
+  <View style={styles.card}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.cardTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={styles.cardDate}>{item.date}</Text>
+      <Text style={styles.cardTxn}>{item.txnId}</Text>
+      {/* ✅ ADD: Show payment gateway */}
+      {item.gateway && (
+        <Text style={styles.cardGateway}>via {item.gateway}</Text>
+      )}
+    </View>
+    <View style={{ alignItems: 'flex-end' }}>
+      <Text style={styles.amount}>{item.amount}</Text>
+      <View style={[
+        styles.statusBadge, 
+        item.status === 'completed' && styles.statusSuccess,
+        item.status === 'failed' && styles.statusFailed,
+        item.status === 'pending' && styles.statusPending
+      ]}>
+        <Text style={styles.statusText}>
+          {item.status === 'completed' ? 'Success' : 
+           item.status === 'failed' ? 'Failed' : 
+           'Pending'}
         </Text>
       </View>
     </View>
-  );
+  </View>
+);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -292,14 +338,37 @@ const styles = StyleSheet.create({
   amount: { fontSize: 15, fontWeight: '700', alignSelf: 'center' },
   credit: { color: '#4CAF50' },
   debit: { color: '#f44336' },
-  status: { fontSize: 11, marginTop: 4, textTransform: 'capitalize' },
-  statusSuccess: { color: '#4CAF50' },
-  statusFailed: { color: '#f44336' },
 
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 10, fontSize: 14, color: '#666' },
   emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 50 },
   emptyText: { color: '#999', fontSize: 15 },
+  cardGateway: { 
+    fontSize: 11, 
+    color: '#666', 
+    marginTop: 2,
+    fontStyle: 'italic'
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  statusSuccess: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusFailed: {
+    backgroundColor: '#FFEBEE',
+  },
+  statusPending: {
+    backgroundColor: '#FFF3E0',
+  },
 });
 
 export default WalletScreen;

@@ -11,13 +11,14 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import HeaderIcons from '../../component/HeaderIcons';
 import astrologerService from '../../services/api/AstrologerService';
-import orderService from '../../services/api/OrderService';
+import livestreamService from '../../services/api/LivestreamService';
 import walletService from '../../services/api/WalletService';
 import userService from '../../services/api/UserService';
 import { useAuth } from '../../context/AuthContext';
@@ -27,13 +28,16 @@ const { width } = Dimensions.get('window');
 const Home = ({ navigation }) => {
   const { user } = useAuth();
   
-  // ✅ FIX: All hooks must be at the top in the same order
   const scrollViewRef = useRef(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('ENG');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  
+  // ✅ NEW: Separate state for live streams and astrologers
+  const [liveStreams, setLiveStreams] = useState([]);
   const [liveAstrologers, setLiveAstrologers] = useState([]);
   const [chatAstrologers, setChatAstrologers] = useState([]);
 
@@ -43,7 +47,6 @@ const Home = ({ navigation }) => {
     { code: 'FRA', name: 'French' },
   ];
 
-  // Top banners (auto-toggle)
   const banners = [
     {
       id: 1,
@@ -65,47 +68,131 @@ const Home = ({ navigation }) => {
     loadHomeData();
     
     // Auto-toggle banners every 5 seconds
-    const interval = setInterval(() => {
+    const bannerInterval = setInterval(() => {
       setCurrentBannerIndex((prev) => (prev + 1) % banners.length);
     }, 5000);
 
-    return () => clearInterval(interval);
+    // Auto-refresh live streams every 30 seconds
+    const liveInterval = setInterval(() => {
+      loadLiveStreams();
+    }, 30000);
+
+    return () => {
+      clearInterval(bannerInterval);
+      clearInterval(liveInterval);
+    };
   }, []);
 
-  // Load all home screen data
+  // ✅ Load all home screen data
   const loadHomeData = async () => {
     setLoading(true);
     try {
-      // Load wallet balance
-      try {
-        const walletResponse = await walletService.getWalletStats();
-        if (walletResponse.success) {
-          setWalletBalance(walletResponse.data.currentBalance || 0);
-        }
-      } catch (error) {
-        console.log('Wallet fetch skipped');
-      }
-
-      // Load all astrologers
-      try {
-        const response = await astrologerService.getAstrologers({
-          page: 1,
-          limit: 20,
-        });
-        if (response.success) {
-          const astros = response.data.astrologers;
-          // Filter online astrologers
-          const onlineAstros = astros.filter((astro) => astro.availability?.isOnline === true);
-          setLiveAstrologers(onlineAstros);
-          setChatAstrologers(astros);
-        }
-      } catch (error) {
-        console.log('Astrologers fetch skipped');
-      }
+      await Promise.all([
+        loadWalletBalance(),
+        loadLiveStreams(),
+        loadAstrologers(),
+      ]);
     } catch (error) {
       console.error('Load home data error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ Pull to refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadHomeData();
+    setRefreshing(false);
+  };
+
+  // ✅ Load wallet balance
+  const loadWalletBalance = async () => {
+    try {
+      const walletResponse = await walletService.getWalletStats();
+      if (walletResponse.success) {
+        setWalletBalance(walletResponse.data.currentBalance || 0);
+      }
+    } catch (error) {
+      console.log('⚠️ Wallet fetch skipped');
+    }
+  };
+
+  // ✅ Load live streams
+  const loadLiveStreams = async () => {
+    try {
+      console.log('📡 Fetching live streams...');
+      const response = await livestreamService.getLiveStreams({ page: 1, limit: 10 });
+      
+      if (response.success) {
+        console.log('✅ Live streams fetched:', response.data.length, 'items');
+        setLiveStreams(response.data);
+      }
+    } catch (error) {
+      console.log('⚠️ Live streams fetch error:', error.message);
+      setLiveStreams([]);
+    }
+  };
+
+  // ✅ Load astrologers (using your method)
+  const loadAstrologers = async () => {
+    try {
+      console.log('📡 Fetching astrologers...');
+      
+      const params = {
+        page: 1,
+        limit: 20,
+        sortBy: 'popularity',
+      };
+
+      const response = await astrologerService.searchAstrologers(params);
+      
+      console.log('📦 Astrologers response:', response);
+
+      if (response.success && response.data) {
+        const astrologersList = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.astrologers || [];
+        
+        console.log('✅ Astrologers fetched:', astrologersList.length, 'items');
+
+        // Format data
+        const formattedData = astrologersList.map((astro, index) => {
+          const astrologerId = astro._id?.toString() || astro.id?.toString() || `astro-${index}`;
+
+          return {
+            id: astrologerId,
+            _id: astrologerId, // Keep original
+            name: astro.name,
+            skills: astro.specializations || [],
+            languages: astro.languages || [],
+            experienceYears: astro.experienceYears || 0,
+            pricing: astro.pricing || {},
+            rating: astro.ratings?.average || 5,
+            totalOrders: astro.stats?.totalOrders || 0,
+            profilePicture: astro.profilePicture || 'https://i.pravatar.cc/100',
+            isOnline: astro.availability?.isOnline || false,
+            isAvailable: astro.availability?.isAvailable || false,
+          };
+        });
+
+        // Separate online and all astrologers
+        const onlineAstros = formattedData.filter(astro => astro.isOnline);
+        
+        setLiveAstrologers(onlineAstros);
+        setChatAstrologers(formattedData);
+
+        console.log('✅ Online astrologers:', onlineAstros.length);
+        console.log('✅ Total astrologers:', formattedData.length);
+      } else {
+        console.warn('⚠️ No astrologers data');
+        setLiveAstrologers([]);
+        setChatAstrologers([]);
+      }
+    } catch (error) {
+      console.error('❌ Astrologers fetch error:', error);
+      setLiveAstrologers([]);
+      setChatAstrologers([]);
     }
   };
 
@@ -122,9 +209,16 @@ const Home = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView ref={scrollViewRef} style={styles.mainContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        ref={scrollViewRef} 
+        style={styles.mainContainer} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#fdd835']} />
+        }
+      >
         <View style={styles.container}>
-          {/* Top Row: Profile Icons & Add Cash Button */}
+          {/* Top Row */}
           <View style={styles.topRow}>
             <HeaderIcons />
 
@@ -187,11 +281,69 @@ const Home = ({ navigation }) => {
               </View>
             </View>
 
-            {/* 2. LIVE ASTROLOGERS */}
+            {/* ✅ 2. LIVE STREAMS SECTION */}
+            {liveStreams.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="video" size={20} color="#ff0000" />
+                    <Text style={[styles.sectionTitle, { marginLeft: 6 }]}>Live Streams</Text>
+                    <View style={styles.liveBadge}>
+                      <View style={styles.liveDot} />
+                      <Text style={styles.liveText}>LIVE</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => navigation.navigate('LiveStreamScreen')}>
+                    <Text style={styles.viewAll}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+                  {liveStreams.map((stream) => (
+                    <TouchableOpacity
+                      key={stream._id}
+                      style={styles.liveStreamCard}
+                      onPress={() => navigation.navigate('LiveStreamScreen', { streamId: stream.streamId })}
+                    >
+                      {/* Thumbnail */}
+                      <View style={styles.thumbnailContainer}>
+                        <Image
+                          source={{ uri: stream.hostId?.profilePicture || 'https://i.pravatar.cc/150' }}
+                          style={styles.streamThumbnail}
+                        />
+                        <View style={styles.liveIndicator}>
+                          <View style={styles.liveIndicatorDot} />
+                          <Text style={styles.liveIndicatorText}>LIVE</Text>
+                        </View>
+                        <View style={styles.viewerCount}>
+                          <Ionicons name="eye" size={12} color="#fff" />
+                          <Text style={styles.viewerCountText}>{stream.viewerCount || 0}</Text>
+                        </View>
+                      </View>
+                      
+                      {/* Info */}
+                      <View style={styles.streamInfo}>
+                        <Text style={styles.streamTitle} numberOfLines={2}>
+                          {stream.title}
+                        </Text>
+                        <Text style={styles.streamHost} numberOfLines={1}>
+                          {stream.hostId?.name || 'Astrologer'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            {/* ✅ 3. LIVE ASTROLOGERS (Online) */}
             {liveAstrologers.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Live Astrologers</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={styles.onlineDotSmall} />
+                    <Text style={styles.sectionTitle}>Online Astrologers</Text>
+                  </View>
                   <TouchableOpacity onPress={() => navigation.navigate('Call')}>
                     <Text style={styles.viewAll}>View All</Text>
                   </TouchableOpacity>
@@ -199,12 +351,12 @@ const Home = ({ navigation }) => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
                   {liveAstrologers.map((astro) => (
                     <TouchableOpacity
-                      key={astro._id}
+                      key={astro.id}
                       style={styles.astrologerCard}
                       onPress={() => navigation.navigate('AstrologerProfile', { astrologerId: astro._id })}
                     >
                       <Image
-                        source={{ uri: astro.profilePicture || 'https://i.pravatar.cc/100' }}
+                        source={{ uri: astro.profilePicture }}
                         style={styles.liveAvatar}
                       />
                       <Text style={styles.astroName} numberOfLines={1}>
@@ -217,7 +369,7 @@ const Home = ({ navigation }) => {
               </>
             )}
 
-            {/* 3. MIDDLE BANNER */}
+            {/* 4. MIDDLE BANNER */}
             <View style={styles.offerCard}>
               <Ionicons name="gift" size={40} color="#4CAF50" />
               <View style={{ flex: 1, marginLeft: 10 }}>
@@ -226,7 +378,7 @@ const Home = ({ navigation }) => {
               </View>
             </View>
 
-            {/* 4. ASTROLOGERS FOR CHAT */}
+            {/* ✅ 5. ASTROLOGERS FOR CHAT (Working) */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Astrologers for Chat</Text>
               <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
@@ -236,9 +388,9 @@ const Home = ({ navigation }) => {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
               {chatAstrologers.slice(0, 5).map((astro) => (
-                <View key={astro._id} style={styles.astroCard}>
+                <View key={astro.id} style={styles.astroCard}>
                   <Image
-                    source={{ uri: astro.profilePicture || 'https://i.pravatar.cc/100' }}
+                    source={{ uri: astro.profilePicture }}
                     style={styles.astroAvatar}
                   />
                   <Text style={styles.astroName} numberOfLines={1}>
@@ -247,7 +399,7 @@ const Home = ({ navigation }) => {
                   <Text style={styles.astroRate}>₹ {astro.pricing?.chat || 5}/min</Text>
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.ratingText}>{astro.ratings?.average?.toFixed(1) || '5.0'}</Text>
+                    <Text style={styles.ratingText}>{astro.rating.toFixed(1)}</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.chatBtnOutline}
@@ -259,7 +411,7 @@ const Home = ({ navigation }) => {
               ))}
             </ScrollView>
 
-            {/* 5. VAIDIK REMEDY */}
+            {/* 6. VAIDIK REMEDY */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Vaidik Remedy</Text>
               <TouchableOpacity>
@@ -278,7 +430,7 @@ const Home = ({ navigation }) => {
               ))}
             </ScrollView>
 
-            {/* 6. VAIDIKTALK STORE */}
+            {/* 7. VAIDIKTALK STORE */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Vaidiktalk Store</Text>
               <TouchableOpacity>
@@ -298,7 +450,7 @@ const Home = ({ navigation }) => {
               ))}
             </ScrollView>
 
-            {/* 7. TRUST INDICATORS */}
+            {/* 8. TRUST INDICATORS */}
             <View style={styles.trustSection}>
               <View style={styles.trustCard}>
                 <MaterialCommunityIcons name="shield-lock" size={40} color="#4CAF50" />
@@ -470,6 +622,111 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#000' },
   viewAll: { fontSize: 13, color: '#fdd835', fontWeight: '600' },
+  
+  // ✅ Live stream styles
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff0000',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+    marginLeft: 8,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#fff',
+    marginRight: 3,
+  },
+  liveText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  liveStreamCard: {
+    width: 180,
+    marginLeft: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  thumbnailContainer: {
+    width: '100%',
+    height: 100,
+    position: 'relative',
+  },
+  streamThumbnail: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e0e0e0',
+  },
+  liveIndicator: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 0, 0, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  liveIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+    marginRight: 4,
+  },
+  liveIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  viewerCount: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  viewerCountText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  streamInfo: {
+    padding: 10,
+  },
+  streamTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4,
+  },
+  streamHost: {
+    fontSize: 11,
+    color: '#666',
+  },
+  onlineDotSmall: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+    marginRight: 8,
+  },
+  
   astrologerCard: {
     alignItems: 'center',
     marginLeft: 10,

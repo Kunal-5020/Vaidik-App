@@ -242,6 +242,36 @@ export const livestreamService = {
       throw error;
     }
   },
+
+  /**
+ * Cancel call request
+ * POST /streams/:streamId/call/cancel
+ */
+cancelCallRequest: async (streamId) => {
+  try {
+    console.log('📡 Canceling call request:', streamId);
+    const response = await apiClient.post(`/streams/${streamId}/call/cancel`);
+    
+    if (response.data.success) {
+      console.log('✅ Call request canceled');
+      return {
+        success: true,
+        message: response.data.message,
+      };
+    }
+    
+    throw new Error(response.data.message || 'Failed to cancel call request');
+  } catch (error) {
+    console.error('❌ Cancel call request error:', error);
+    // ✅ Don't throw error if it's just "not found"
+    if (error.response?.status === 400) {
+      console.warn('⚠️ Call already processed (accepted/rejected)');
+      return { success: true, message: 'Call already processed' };
+    }
+    throw error;
+  }
+},
+
 };
 
 export default livestreamService;

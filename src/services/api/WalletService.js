@@ -331,6 +331,65 @@ export const walletService = {
       throw error;
     }
   },
+
+  /**
+ * Get payment gateway logs (recharge attempts with gateway details)
+ * API: GET /wallet/transactions?type=recharge
+ * 
+ * @param {Object} params - Query parameters
+ * @param {number} params.page - Page number
+ * @param {number} params.limit - Items per page
+ * @param {string} params.status - Optional: filter by status
+ * 
+ * Returns payment gateway transaction logs
+ */
+getPaymentLogs: async (params = {}) => {
+  try {
+    console.log('📡 Fetching payment logs...', params);
+
+    const queryParams = new URLSearchParams();
+
+    // ✅ Payment logs = recharge transactions only
+    queryParams.append('type', 'recharge');
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.status) queryParams.append('status', params.status);
+
+    const response = await apiClient.get(
+      `/wallet/transactions?${queryParams.toString()}`
+    );
+
+    if (response.data.success) {
+      console.log('✅ Payment logs fetched:', response.data.data.transactions.length, 'items');
+      
+      // Transform to match payment log structure
+      const logs = response.data.data.transactions.map(txn => ({
+        _id: txn._id,
+        paymentId: txn.paymentId || txn.transactionId,
+        description: txn.description || `Wallet recharge of ₹${txn.amount}`,
+        amount: txn.amount,
+        status: txn.status,
+        paymentGateway: txn.paymentGateway,
+        createdAt: txn.createdAt,
+        updatedAt: txn.updatedAt
+      }));
+
+      return {
+        success: true,
+        data: {
+          logs,
+          pagination: response.data.data.pagination
+        }
+      };
+    }
+
+    throw new Error(response.data.message || 'Failed to fetch payment logs');
+  } catch (error) {
+    console.error('❌ Get payment logs error:', error);
+    throw error;
+  }
+},
 };
 
 export default walletService;
