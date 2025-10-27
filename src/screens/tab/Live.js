@@ -16,6 +16,7 @@ import {
   Alert,
   Animated,
   ScrollView,
+  PermissionsAndroid, // ✅ ADD THIS
 } from 'react-native';
 import {
   createAgoraRtcEngine,
@@ -28,8 +29,10 @@ import { streamSocketService } from '../../services/api/socket/streamSocketServi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 
+
 const { width, height } = Dimensions.get('window');
 const AGORA_APP_ID = '203397a168f8469bb8e672cd15eb3eb6';
+
 
 const LiveStreamScreen = ({ navigation }) => {
   const { user: authUser, isAuthenticated, fetchUserProfile } = useAuth();
@@ -57,6 +60,8 @@ const LiveStreamScreen = ({ navigation }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [currentCall, setCurrentCall] = useState(null);
+  const [permissionsGranted, setPermissionsGranted] = useState(false); // ✅ ADD THIS
+
 
   // Refs
   const engineRef = useRef(null);
@@ -64,18 +69,73 @@ const LiveStreamScreen = ({ navigation }) => {
   const inputRef = useRef(null);
   const giftAnimValue = useRef(new Animated.Value(0)).current;
 
+
+  // ==================== 🆕 ANDROID PERMISSIONS ====================
+  
+  /**
+   * Request camera and microphone permissions for Android
+   * This is CRITICAL for video/audio calls to work
+   */
+  const requestCameraAndAudioPermission = async () => {
+    if (Platform.OS !== 'android') {
+      setPermissionsGranted(true);
+      return true;
+    }
+
+    try {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      ]);
+
+      const cameraGranted = granted['android.permission.CAMERA'] === PermissionsAndroid.RESULTS.GRANTED;
+      const audioGranted = granted['android.permission.RECORD_AUDIO'] === PermissionsAndroid.RESULTS.GRANTED;
+
+      if (cameraGranted && audioGranted) {
+        console.log('✅ Camera and Microphone permissions granted');
+        setPermissionsGranted(true);
+        return true;
+      } else {
+        console.log('❌ Camera/Microphone permissions denied');
+        Alert.alert(
+          'Permissions Required',
+          'Camera and Microphone access is required for video calls. Please enable them in Settings.',
+          [{ text: 'OK' }]
+        );
+        setPermissionsGranted(false);
+        return false;
+      }
+    } catch (err) {
+      console.warn('Permission request error:', err);
+      setPermissionsGranted(false);
+      return false;
+    }
+  };
+
+
   // ==================== INITIALIZATION ====================
+
 
   useEffect(() => {
     initializeUser();
     return () => cleanup();
   }, []);
 
+
   useEffect(() => {
     if (userInitialized && userId) {
-      fetchLiveStreams();
+      // ✅ Request permissions before fetching streams
+      requestCameraAndAudioPermission().then((granted) => {
+        if (granted) {
+          fetchLiveStreams();
+        } else {
+          Alert.alert('Error', 'Permissions required to watch livestreams');
+          navigation.goBack();
+        }
+      });
     }
   }, [userInitialized, userId]);
+
 
   const initializeUser = async () => {
     try {
@@ -136,7 +196,9 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   // ==================== FETCH STREAMS ====================
+
 
   const fetchLiveStreams = async () => {
     if (!userId) return;
@@ -161,7 +223,9 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   // ==================== JOIN/LEAVE STREAM ====================
+
 
   const joinStream = async (stream, index) => {
     if (!userId) return;
@@ -170,6 +234,7 @@ const LiveStreamScreen = ({ navigation }) => {
       if (streams[currentIndex] && currentIndex !== index) {
         await leaveCurrentStream();
       }
+
 
       const joinResponse = await livestreamService.joinStream(stream.streamId);
       
@@ -187,6 +252,7 @@ const LiveStreamScreen = ({ navigation }) => {
           joinResponse.data.agoraUid
         );
 
+
         await connectSocket(stream.streamId);
         setCurrentIndex(index);
       }
@@ -195,6 +261,7 @@ const LiveStreamScreen = ({ navigation }) => {
       Alert.alert('Error', 'Failed to join stream');
     }
   };
+
 
   const leaveCurrentStream = async () => {
     try {
@@ -213,6 +280,7 @@ const LiveStreamScreen = ({ navigation }) => {
           await engineRef.current.leaveChannel();
         }
 
+
         setIsJoined(false);
         setChatMessages([]);
         setCurrentCall(null);
@@ -222,7 +290,9 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
-  // ==================== AGORA ====================
+
+  // ==================== 🔧 FIXED AGORA INITIALIZATION ====================
+
 
   const initializeAgora = async (channelName, token, uid) => {
     try {
@@ -230,14 +300,16 @@ const LiveStreamScreen = ({ navigation }) => {
         const engine = createAgoraRtcEngine();
         engineRef.current = engine;
 
+
         engine.initialize({
           appId: AGORA_APP_ID,
           channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
         });
 
+
         engine.registerEventHandler({
           onJoinChannelSuccess: () => {
-            console.log('✅ Joined channel');
+            console.log('✅ Joined channel as audience');
             setIsJoined(true);
           },
           onUserJoined: (connection, remoteUid) => {
@@ -259,9 +331,11 @@ const LiveStreamScreen = ({ navigation }) => {
           onError: (err, msg) => console.error('Agora error:', err, msg),
         });
 
+        // ✅ Enable video and audio for viewer mode
         engine.enableVideo();
         engine.enableAudio();
       }
+
 
       engineRef.current.setClientRole(ClientRoleType.ClientRoleAudience);
       await engineRef.current.joinChannel(token, channelName, uid, {
@@ -273,7 +347,9 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   // ==================== SOCKET ====================
+
 
   const connectSocket = async (streamId) => {
     if (!userId) return;
@@ -281,9 +357,11 @@ const LiveStreamScreen = ({ navigation }) => {
     try {
       console.log('🔌 Viewer connecting socket:', { streamId, userId, userName });
 
+
       await streamSocketService.connect(streamId, userId, userName, false);
       
       console.log('✅ Socket connected');
+
 
       // Register all listeners
       streamSocketService.onNewComment(handleNewComment);
@@ -324,11 +402,13 @@ const LiveStreamScreen = ({ navigation }) => {
         }
       });
 
+
       streamSocketService.on('stream_ended', (data) => {
         Alert.alert('Stream Ended', `The livestream has ended: ${data.reason}`, [
           { text: 'OK', onPress: () => { cleanup(); navigation.goBack(); }}
         ]);
       });
+
 
       console.log('✅ All listeners registered');
     } catch (error) {
@@ -336,9 +416,20 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
-  // ==================== CALL HANDLING ====================
+
+  // ==================== 🔧 FIXED CALL HANDLING ====================
+
 
   const handleCallRequest = async () => {
+    // ✅ Check permissions first
+    if (!permissionsGranted) {
+      const granted = await requestCameraAndAudioPermission();
+      if (!granted) {
+        Alert.alert('Permissions Required', 'Camera and microphone access required for calls');
+        return;
+      }
+    }
+
     try {
       setWaitingForCall(true);
       setHasRequestedCall(true);
@@ -359,6 +450,7 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   const handleCallStarted = async (data) => {
     if (data.userId !== userId) return;
     
@@ -368,12 +460,23 @@ const LiveStreamScreen = ({ navigation }) => {
     await joinCallAsViewer(data);
   };
 
+
+  /**
+   * ✅ FIXED: Properly enable camera and microphone when joining call
+   */
   const joinCallAsViewer = async (callData) => {
     try {
-      if (isJoined) {
-        await engineRef.current?.leaveChannel();
+      console.log('📞 Joining call as broadcaster...', callData);
+
+      // ✅ Step 1: Leave current channel
+      if (isJoined && engineRef.current) {
+        console.log('⏸️ Leaving viewer channel...');
+        await engineRef.current.leaveChannel();
+        setIsJoined(false);
       }
 
+
+      // ✅ Step 2: Recreate engine if needed
       if (!engineRef.current) {
         const engine = createAgoraRtcEngine();
         engineRef.current = engine;
@@ -385,41 +488,91 @@ const LiveStreamScreen = ({ navigation }) => {
 
         engine.registerEventHandler({
           onJoinChannelSuccess: () => {
+            console.log('✅ Joined call channel as broadcaster');
             setIsJoined(true);
-            Alert.alert('Call Started', 'You are now in call!');
+            Alert.alert('Call Started', 'You are now in the call!');
           },
-          onUserJoined: (connection, remoteUid) => setHostAgoraUid(remoteUid),
+          onUserJoined: (connection, remoteUid) => {
+            console.log('👤 Host joined call:', remoteUid);
+            setHostAgoraUid(remoteUid);
+          },
           onUserOffline: (connection, remoteUid) => {
+            console.log('👋 Host left call:', remoteUid);
             if (remoteUid === callData.hostUid) {
-              Alert.alert('Call Ended', 'The astrologer left');
+              Alert.alert('Call Ended', 'The astrologer left the call');
               leaveCall();
             }
           },
+          onError: (err, msg) => console.error('Call Agora error:', err, msg),
         });
-
-        if (callData.callType === 'video') {
-          engine.enableVideo();
-          engine.startPreview();
-        }
-        engine.enableAudio();
       }
 
+
+      // ✅ Step 3: Enable video and audio BEFORE changing role
+      console.log('🎥 Enabling video and audio...');
+      await engineRef.current.enableVideo();
+      await engineRef.current.enableAudio();
+
+
+      // ✅ Step 4: Start camera preview for video calls
+      if (callData.callType === 'video') {
+        console.log('📹 Starting camera preview...');
+        await engineRef.current.startPreview();
+      }
+
+
+      // ✅ Step 5: Switch to broadcaster role
+      console.log('🎤 Setting client role to BROADCASTER...');
       await engineRef.current.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-      await engineRef.current.joinChannel(callData.token, callData.channelName, callData.uid, {
-        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      });
+
+
+      // ✅ Step 6: Join channel as broadcaster
+      console.log('🚀 Joining call channel...');
+      await engineRef.current.joinChannel(
+        callData.token, 
+        callData.channelName, 
+        callData.uid, 
+        {
+          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+          publishCameraTrack: callData.callType === 'video',
+          publishMicrophoneTrack: true,
+        }
+      );
+
+      console.log('✅ Successfully joined call as broadcaster');
     } catch (error) {
-      console.error('Join call error:', error);
-      Alert.alert('Error', 'Failed to join call');
+      console.error('❌ Join call error:', error);
+      Alert.alert('Error', `Failed to join call: ${error.message}`);
+      
+      // Rollback
+      setCallAccepted(false);
+      setCallData(null);
+      
+      // Try to rejoin as viewer
+      const currentStream = streams[currentIndex];
+      if (currentStream) {
+        setTimeout(() => joinStream(currentStream, currentIndex), 1000);
+      }
     }
   };
 
+
   const leaveCall = async () => {
     try {
+      console.log('📴 Leaving call...');
+      
+      // ✅ Stop camera preview
+      if (engineRef.current && callData?.callType === 'video') {
+        await engineRef.current.stopPreview();
+      }
+
       setCallAccepted(false);
       setCallData(null);
       setHasRequestedCall(false);
+      setIsMuted(false);
+      setIsCameraOff(false);
       
+      // ✅ Rejoin as viewer
       const currentStream = streams[currentIndex];
       if (currentStream) {
         await joinStream(currentStream, currentIndex);
@@ -428,6 +581,7 @@ const LiveStreamScreen = ({ navigation }) => {
       console.error('Leave call error:', error);
     }
   };
+
 
   const cancelCallRequest = async () => {
     try {
@@ -440,12 +594,14 @@ const LiveStreamScreen = ({ navigation }) => {
         console.warn('⚠️ API cancel failed (might be already accepted):', error.message);
       }
 
+
       setWaitingForCall(false);
       setHasRequestedCall(false);
       
       if (callAccepted && callData) {
         await leaveCall();
       }
+
 
       Alert.alert('Success', 'Call request cancelled');
     } catch (error) {
@@ -454,7 +610,32 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
+  // ==================== ✅ FIXED MUTE/CAMERA CONTROLS ====================
+
+
+  const toggleMute = () => {
+    if (!engineRef.current) return;
+    
+    const newMuteState = !isMuted;
+    engineRef.current.muteLocalAudioStream(newMuteState);
+    setIsMuted(newMuteState);
+    console.log(newMuteState ? '🔇 Muted' : '🔊 Unmuted');
+  };
+
+
+  const toggleCamera = () => {
+    if (!engineRef.current || callData?.callType !== 'video') return;
+    
+    const newCameraState = !isCameraOff;
+    engineRef.current.muteLocalVideoStream(newCameraState);
+    setIsCameraOff(newCameraState);
+    console.log(newCameraState ? '📷 Camera off' : '📹 Camera on');
+  };
+
+
   // ==================== EVENT HANDLERS ====================
+
 
   const handleNewComment = (data) => {
     setChatMessages(prev => [...prev, {
@@ -466,6 +647,7 @@ const LiveStreamScreen = ({ navigation }) => {
     }]);
   };
 
+
   const handleNewLike = (data) => {
     setChatMessages(prev => [...prev, {
       id: Date.now().toString() + Math.random(),
@@ -474,6 +656,7 @@ const LiveStreamScreen = ({ navigation }) => {
       timestamp: data.timestamp,
     }]);
   };
+
 
   const handleNewGift = (data) => {
     setChatMessages(prev => [...prev, {
@@ -487,6 +670,7 @@ const LiveStreamScreen = ({ navigation }) => {
     showGiftAnimation(data);
   };
 
+
   const handleViewerJoined = (data) => {
     setChatMessages(prev => [...prev, {
       id: Date.now().toString() + Math.random(),
@@ -496,15 +680,18 @@ const LiveStreamScreen = ({ navigation }) => {
     }]);
   };
 
+
   const handleViewerCountUpdate = (data) => {
     setStreams(prev => prev.map((s, i) => 
       i === currentIndex ? { ...s, viewerCount: data.count } : s
     ));
   };
 
+
   const showGiftAnimation = (giftData) => {
     const giftId = Date.now().toString() + Math.random();
     setActiveGifts(prev => [...prev, { ...giftData, id: giftId }]);
+
 
     Animated.sequence([
       Animated.timing(giftAnimValue, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -513,13 +700,16 @@ const LiveStreamScreen = ({ navigation }) => {
     ]).start(() => setActiveGifts(prev => prev.filter(g => g.id !== giftId)));
   };
 
+
   // ==================== INTERACTIONS ====================
+
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
     streamSocketService.sendComment(streams[currentIndex].streamId, userId, userName, null, message.trim());
     setMessage('');
   };
+
 
   const handleSendGift = async (giftType, giftName, amount) => {
     try {
@@ -531,9 +721,11 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   const handleLike = () => {
     streamSocketService.sendLike(streams[currentIndex].streamId, userId, userName);
   };
+
 
   const handleToggleFollow = async () => {
     try {
@@ -545,13 +737,18 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   // ==================== CLEANUP ====================
+
 
   const cleanup = async () => {
     try {
       await leaveCurrentStream();
       streamSocketService.disconnect();
+      
       if (engineRef.current) {
+        // ✅ Stop preview before destroying
+        await engineRef.current.stopPreview();
         engineRef.current.release();
         engineRef.current = null;
       }
@@ -560,7 +757,9 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   // ==================== NAVIGATION ====================
+
 
   const handleSwitchStream = (stream, index) => {
     joinStream(stream, index);
@@ -568,11 +767,13 @@ const LiveStreamScreen = ({ navigation }) => {
     flatListRef.current?.scrollToIndex({ index, animated: true });
   };
 
+
   const handleLeave = async () => {
     await leaveCurrentStream();
     setLeaveModalVisible(false);
     navigation.goBack();
   };
+
 
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -582,12 +783,15 @@ const LiveStreamScreen = ({ navigation }) => {
     }
   };
 
+
   const handleOpenChat = () => {
     setChatOpen(true);
     setTimeout(() => inputRef.current?.focus(), 200);
   };
 
+
   // ==================== RENDER ====================
+
 
   if (loading || streams.length === 0) {
     return (
@@ -598,7 +802,9 @@ const LiveStreamScreen = ({ navigation }) => {
     );
   }
 
+
   const currentStream = streams[currentIndex];
+
 
   return (
     <View style={styles.container}>
@@ -619,6 +825,7 @@ const LiveStreamScreen = ({ navigation }) => {
               <>
                 {currentCall && currentCall.callType === 'video' ? (
                   <View style={styles.splitScreenContainer}>
+                    {/* Host Video (Top Half) */}
                     <View style={styles.remoteVideoHalf}>
                       {hostAgoraUid ? (
                         <RtcSurfaceView style={styles.halfVideo} canvas={{ uid: hostAgoraUid, renderMode: 1 }} />
@@ -632,11 +839,16 @@ const LiveStreamScreen = ({ navigation }) => {
                       </View>
                     </View>
 
+                    {/* Caller Video (Bottom Half) */}
                     <View style={styles.localVideoHalf}>
-                      {currentCall.callerAgoraUid ? (
+                      {callAccepted && callData ? (
+                        <RtcSurfaceView 
+                          style={styles.halfVideo} 
+                          canvas={{ uid: 0 }} 
+                          zOrderMediaOverlay={true} 
+                        />
+                      ) : currentCall.callerAgoraUid ? (
                         <RtcSurfaceView style={styles.halfVideo} canvas={{ uid: currentCall.callerAgoraUid, renderMode: 1 }} />
-                      ) : callAccepted && callData ? (
-                        <RtcSurfaceView style={styles.halfVideo} canvas={{ uid: 0 }} zOrderMediaOverlay={true} />
                       ) : (
                         <View style={styles.videoPlaceholder}>
                           <ActivityIndicator size="large" color="#f6b900" />
@@ -672,6 +884,7 @@ const LiveStreamScreen = ({ navigation }) => {
         )}
       />
 
+
       {/* Overlay UI */}
       <View style={styles.overlay} pointerEvents="box-none">
         {/* Top Bar */}
@@ -691,7 +904,8 @@ const LiveStreamScreen = ({ navigation }) => {
           <TouchableOpacity onPress={() => setLeaveModalVisible(true)}><Image source={require('../../assets/cross.png')} style={styles.closeIcon} /></TouchableOpacity>
         </View>
 
-        {/* Call Controls (only for active caller) */}
+
+        {/* ✅ FIXED: Call Controls */}
         {callAccepted && callData && (
           <View style={styles.callControlsOverlay}>
             <View style={styles.callIndicatorBadge}>
@@ -699,21 +913,32 @@ const LiveStreamScreen = ({ navigation }) => {
               <Text style={styles.callBadgeText}>{callData.callType === 'video' ? '📹 Video Call' : '📞 Voice Call'}</Text>
             </View>
             <View style={styles.callControlsRow}>
-              <TouchableOpacity style={styles.controlButton} onPress={() => { engineRef.current?.muteLocalAudioStream(!isMuted); setIsMuted(!isMuted); }}>
+              <TouchableOpacity style={styles.controlButton} onPress={toggleMute}>
                 <Text style={{ fontSize: 24 }}>{isMuted ? '🔇' : '🔊'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.endCallBtn} onPress={() => Alert.alert('End Call', 'Are you sure?', [{ text: 'Cancel' }, { text: 'End', onPress: leaveCall }])}>
+              <TouchableOpacity 
+                style={styles.endCallBtn} 
+                onPress={() => Alert.alert(
+                  'End Call', 
+                  'Are you sure you want to end the call?', 
+                  [
+                    { text: 'Cancel', style: 'cancel' }, 
+                    { text: 'End', style: 'destructive', onPress: leaveCall }
+                  ]
+                )}
+              >
                 <Text style={{ fontSize: 24 }}>📞</Text>
                 <Text style={styles.endCallText}>End Call</Text>
               </TouchableOpacity>
               {callData.callType === 'video' && (
-                <TouchableOpacity style={styles.controlButton} onPress={() => { engineRef.current?.muteLocalVideoStream(!isCameraOff); setIsCameraOff(!isCameraOff); }}>
+                <TouchableOpacity style={styles.controlButton} onPress={toggleCamera}>
                   <Text style={{ fontSize: 24 }}>{isCameraOff ? '📷' : '📹'}</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
         )}
+
 
         {/* Waiting indicator */}
         {waitingForCall && !callAccepted && (
@@ -728,6 +953,7 @@ const LiveStreamScreen = ({ navigation }) => {
           </View>
         )}
 
+
         {/* Right Actions */}
         <View style={styles.rightButtons}>
           <TouchableOpacity style={styles.sideBtn} onPress={handleLike}><Text style={styles.sideIcon}>❤️</Text></TouchableOpacity>
@@ -739,6 +965,7 @@ const LiveStreamScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.sideBtn}><Text style={styles.sideIcon}>↗️</Text></TouchableOpacity>
         </View>
 
+
         {/* Gift Animations */}
         {activeGifts.map((gift) => (
           <Animated.View key={gift.id} style={[styles.giftAnimation, { opacity: giftAnimValue, transform: [{ translateY: giftAnimValue.interpolate({ inputRange: [0, 1], outputRange: [100, -100] }) }] }]}>
@@ -747,6 +974,7 @@ const LiveStreamScreen = ({ navigation }) => {
             <Text style={styles.giftAmount}>₹{gift.amount}</Text>
           </Animated.View>
         ))}
+
 
         {/* Chat Messages */}
         <ScrollView style={styles.chatMessagesContainer} showsVerticalScrollIndicator={false}>
@@ -760,8 +988,10 @@ const LiveStreamScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
+
         {/* Chat Button */}
         {!chatOpen && (<TouchableOpacity style={styles.chatBubble} onPress={handleOpenChat}><Text style={{ fontSize: 20 }}>💬</Text></TouchableOpacity>)}
+
 
         {/* Chat Input */}
         {chatOpen && (
@@ -771,6 +1001,7 @@ const LiveStreamScreen = ({ navigation }) => {
           </KeyboardAvoidingView>
         )}
       </View>
+
 
       {/* Leave Modal */}
       <Modal visible={leaveModalVisible} animationType="slide" transparent onRequestClose={() => setLeaveModalVisible(false)}>
@@ -793,9 +1024,11 @@ const LiveStreamScreen = ({ navigation }) => {
   );
 };
 
+
 export default LiveStreamScreen;
 
-// ==================== STYLES (same as before) ====================
+
+// ==================== STYLES ====================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
