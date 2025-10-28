@@ -24,14 +24,14 @@ class StreamSocketService {
 
       console.log('====================================');
       console.log('🔌 Creating socket connection...');
-      console.log('URL: http://192.168.1.10:3001/stream');
+      console.log('URL: http://192.168.1.23:3001/stream');
       console.log('User ID:', userId);
       console.log('User Name:', userName);
       console.log('Is Host:', isHost);
       console.log('====================================');
 
       return new Promise((resolve, reject) => {
-        this.socket = io('http://192.168.1.10:3001/stream', {
+        this.socket = io('http://192.168.1.23:3001/stream', {
           transports: ['websocket'],
           query: { userId, userName },
           auth: { token: accessToken },
@@ -64,7 +64,7 @@ class StreamSocketService {
           
           // Debug all incoming events
           this.socket.onAny((eventName, ...args) => {
-            console.log('🔔 INCOMING:', eventName, args);
+            console.log('🔔 INCOMING EVENT:', eventName, JSON.stringify(args, null, 2));
           });
           
           resolve(true);
@@ -104,6 +104,7 @@ class StreamSocketService {
       this.connected = false;
       this.streamId = null;
       this.listeners.clear();
+      console.log('✅ Socket disconnected and cleaned up');
     }
   }
 
@@ -117,53 +118,113 @@ class StreamSocketService {
   // ==================== EVENT EMITTERS ====================
 
   sendComment(streamId, userId, userName, userAvatar, comment) {
-    if (!this.socket) return;
+    if (!this.socket?.connected) {
+      console.error('❌ Socket not connected - cannot send comment');
+      return;
+    }
     this.socket.emit('send_comment', { streamId, userId, userName, userAvatar, comment });
+    console.log('💬 Comment sent:', { userName, comment });
   }
 
   sendLike(streamId, userId, userName) {
-    if (!this.socket) return;
+    if (!this.socket?.connected) return;
     this.socket.emit('send_like', { streamId, userId, userName });
+    console.log('❤️ Like sent:', { userName });
   }
 
   sendGift(streamId, userId, userName, userAvatar, giftType, giftName, amount) {
-    if (!this.socket) return;
+    if (!this.socket?.connected) return;
     this.socket.emit('send_gift', { streamId, userId, userName, userAvatar, giftType, giftName, amount });
+    console.log('🎁 Gift sent:', { userName, giftName, amount });
   }
 
-  notifyCallAccepted(streamId, userId, userName, callType, callMode) {
-    if (!this.socket) return;
-    console.log('📞 Notifying call accepted:', { streamId, userId, userName, callType, callMode });
-    this.socket.emit('call_accepted', { streamId, userId, userName, callType, callMode });
+  // ✅ FIX ISSUE 1: Enhanced call acceptance with proper data
+  notifyCallAccepted(streamId, userId, userName, callType, callMode, callerAgoraUid) {
+    if (!this.socket?.connected) {
+      console.error('❌ Socket not connected - cannot notify call accepted');
+      return;
+    }
+    
+    const data = { 
+      streamId, 
+      userId, 
+      userName, 
+      callType, 
+      callMode, 
+      callerAgoraUid,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('====================================');
+    console.log('📞 EMITTING call_accepted EVENT');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('====================================');
+    
+    this.socket.emit('call_accepted', data);
   }
 
+  // ✅ FIX ISSUE 3: Enhanced call rejection
   notifyCallRejected(streamId, userId) {
-    if (!this.socket) return;
-    console.log('❌ Notifying call rejected:', { streamId, userId });
-    this.socket.emit('call_rejected', { streamId, userId });
+    if (!this.socket?.connected) {
+      console.error('❌ Socket not connected - cannot notify call rejected');
+      return;
+    }
+    
+    const data = { streamId, userId, timestamp: new Date().toISOString() };
+    
+    console.log('====================================');
+    console.log('❌ EMITTING call_rejected EVENT');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('====================================');
+    
+    this.socket.emit('call_rejected', data);
   }
 
+  // ✅ FIX ISSUE 2 & 3: Enhanced call end notification
   notifyCallEnded(streamId, duration, charge) {
-    if (!this.socket) return;
-    console.log('📞 Notifying call ended:', { streamId, duration, charge });
-    this.socket.emit('call_ended', { streamId, duration, charge });
+    if (!this.socket?.connected) {
+      console.error('❌ Socket not connected - cannot notify call ended');
+      return;
+    }
+    
+    const data = { 
+      streamId, 
+      duration, 
+      charge,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('====================================');
+    console.log('📞 EMITTING call_ended EVENT');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('====================================');
+    
+    this.socket.emit('call_ended', data);
   }
 
   notifyHostMicToggled(streamId, enabled) {
-    if (!this.socket) return;
-    this.socket.emit('host_mic_toggled', { streamId, enabled });
+    if (!this.socket?.connected) return;
+    this.socket.emit('host_mic_toggled', { streamId, enabled, timestamp: new Date().toISOString() });
+    console.log('🎤 Host mic toggled:', enabled);
   }
 
   notifyHostCameraToggled(streamId, enabled) {
-    if (!this.socket) return;
-    this.socket.emit('host_camera_toggled', { streamId, enabled });
+    if (!this.socket?.connected) return;
+    this.socket.emit('host_camera_toggled', { streamId, enabled, timestamp: new Date().toISOString() });
+    console.log('📹 Host camera toggled:', enabled);
   }
 
   // ==================== EVENT LISTENERS ====================
 
   on(eventName, callback) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.error('❌ Socket not initialized - cannot add listener for:', eventName);
+      return;
+    }
+    
+    console.log('🎧 Registering listener for:', eventName);
     this.socket.on(eventName, callback);
+    
     if (!this.listeners.has(eventName)) {
       this.listeners.set(eventName, []);
     }
@@ -186,53 +247,184 @@ class StreamSocketService {
     this.listeners.delete(eventName);
   }
 
-  // Convenience methods
-  onNewComment(callback) { this.on('new_comment', callback); }
-  onNewLike(callback) { this.on('new_like', callback); }
-  onNewGift(callback) { this.on('new_gift', callback); }
-  onViewerJoined(callback) { this.on('viewer_joined', callback); }
-  onViewerLeft(callback) { this.on('viewer_left', callback); }
-  onViewerCountUpdated(callback) { this.on('viewer_count_updated', callback); }
+  // ==================== CONVENIENCE METHODS ====================
+
+  // Chat & Interaction
+  onNewComment(callback) { 
+    this.on('new_comment', (data) => {
+      console.log('💬 New comment received:', data);
+      callback(data);
+    }); 
+  }
   
+  onNewLike(callback) { 
+    this.on('new_like', (data) => {
+      console.log('❤️ New like received:', data);
+      callback(data);
+    }); 
+  }
+  
+  onNewGift(callback) { 
+    this.on('new_gift', (data) => {
+      console.log('🎁 New gift received:', data);
+      callback(data);
+    }); 
+  }
+
+  // Viewer Management
+  onViewerJoined(callback) { 
+    this.on('viewer_joined', (data) => {
+      console.log('👋 Viewer joined:', data);
+      callback(data);
+    }); 
+  }
+  
+  onViewerLeft(callback) { 
+    this.on('viewer_left', (data) => {
+      console.log('👋 Viewer left:', data);
+      callback(data);
+    }); 
+  }
+  
+  onViewerCountUpdated(callback) { 
+    this.on('viewer_count_updated', (data) => {
+      console.log('👥 Viewer count updated:', data);
+      callback(data);
+    }); 
+  }
+
+  // ✅ Call Management - HOST PERSPECTIVE
   onCallRequestReceived(callback) {
     if (!this.socket) {
       console.error('❌ Socket not initialized');
       return;
     }
-    console.log('📞 Setting up call request listener');
+    
+    console.log('🎧 Setting up call_request_received listener (HOST)');
+    
     this.socket.on('call_request_received', (data) => {
-      console.log('📞 call_request_received EVENT:', data);
+      console.log('====================================');
+      console.log('📞 HOST: call_request_received EVENT');
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('====================================');
       callback(data);
     });
   }
 
+  // ✅ FIX ISSUE 1 & 3: VIEWER PERSPECTIVE - Listen for call acceptance
+  onCallAccepted(callback) {
+    if (!this.socket) {
+      console.error('❌ Socket not initialized');
+      return;
+    }
+    
+    console.log('🎧 Setting up call_accepted listener (VIEWER)');
+    
+    this.socket.on('call_accepted', (data) => {
+      console.log('====================================');
+      console.log('📞 VIEWER: call_accepted EVENT RECEIVED');
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('====================================');
+      callback(data);
+    });
+  }
+
+  // ✅ FIX ISSUE 3: VIEWER PERSPECTIVE - Listen for call rejection
+  onCallRejected(callback) {
+    if (!this.socket) {
+      console.error('❌ Socket not initialized');
+      return;
+    }
+    
+    console.log('🎧 Setting up call_rejected listener (VIEWER)');
+    
+    this.socket.on('call_rejected', (data) => {
+      console.log('====================================');
+      console.log('❌ VIEWER: call_rejected EVENT RECEIVED');
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('====================================');
+      callback(data);
+    });
+  }
+
+  // ✅ FIX ISSUE 2 & 3: BOTH PERSPECTIVES - Listen for call end
+  onCallEnded(callback) {
+    if (!this.socket) {
+      console.error('❌ Socket not initialized');
+      return;
+    }
+    
+    console.log('🎧 Setting up call_ended listener');
+    
+    this.socket.on('call_ended', (data) => {
+      console.log('====================================');
+      console.log('📞 call_ended EVENT RECEIVED');
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('====================================');
+      callback(data);
+    });
+  }
+
+  // ✅ Legacy support - kept for compatibility
   onCallStarted(callback) {
     if (!this.socket) return;
-    console.log('🎧 Setting up onCallStarted listener');
+    console.log('🎧 Setting up call_started listener (legacy)');
+    
     this.socket.on('call_started', (data) => {
-      console.log('📞 Call started event:', data);
+      console.log('📞 call_started event (legacy):', data);
       callback(data);
     });
   }
 
   onCallFinished(callback) {
     if (!this.socket) return;
-    console.log('🎧 Setting up onCallFinished listener');
+    console.log('🎧 Setting up call_finished listener (legacy)');
+    
+    // Handle both old and new event names
     this.socket.on('call_finished', (data) => {
-      console.log('📞 Call finished event:', data);
+      console.log('📞 call_finished event (legacy):', data);
       callback(data);
     });
+    
     this.socket.on('call_ended', (data) => {
-      console.log('📞 Call ended event:', data);
+      console.log('📞 call_ended event:', data);
       callback(data);
     });
   }
 
   onCallRequestRejected(callback) {
     if (!this.socket) return;
-    console.log('🎧 Setting up onCallRequestRejected listener');
+    console.log('🎧 Setting up call_request_rejected listener (legacy)');
+    
     this.socket.on('call_request_rejected', (data) => {
-      console.log('❌ Call rejected event:', data);
+      console.log('❌ call_request_rejected event (legacy):', data);
+      callback(data);
+    });
+    
+    // Also listen to the new event name
+    this.socket.on('call_rejected', (data) => {
+      console.log('❌ call_rejected event:', data);
+      callback(data);
+    });
+  }
+
+  // ✅ Host Settings
+  onHostMicToggled(callback) {
+    if (!this.socket) return;
+    console.log('🎧 Setting up host_mic_toggled listener');
+    
+    this.socket.on('host_mic_toggled', (data) => {
+      console.log('🎤 Host mic toggled:', data);
+      callback(data);
+    });
+  }
+
+  onHostCameraToggled(callback) {
+    if (!this.socket) return;
+    console.log('🎧 Setting up host_camera_toggled listener');
+    
+    this.socket.on('host_camera_toggled', (data) => {
+      console.log('📹 Host camera toggled:', data);
       callback(data);
     });
   }
